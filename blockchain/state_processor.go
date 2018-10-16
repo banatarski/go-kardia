@@ -130,7 +130,9 @@ func ApplyTransaction(logger log.Logger, bc ChainContext, gp *GasPool, statedb *
 	if err != nil {
 		return nil, 0, err
 	}
-	logger.Info("Applying msg successfully", "rep", msg.To().String())
+	if msg.To() != nil {
+		logger.Info("Applying msg successfully", "rep", msg.To().String())
+	}
 	// Update the state with pending changes
 	root := statedb.IntermediateRoot(true).Bytes()
 	*usedGas += gas
@@ -201,6 +203,9 @@ func IntrinsicGas(data []byte, contractCreation bool) (uint64, error) {
 	} else {
 		gas = configs.TxGas
 	}
+	// TODO add flag to use zero gas fee
+	return gas, nil
+
 	// Bump the required gas by the amount of transactional data
 	if len(data) > 0 {
 		// Zero and non-zero bytes are priced differently
