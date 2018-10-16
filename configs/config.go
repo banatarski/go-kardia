@@ -118,13 +118,13 @@ type GasTable struct {
 var (
 	// GasTableV0 contain the gas prices for the initial phase.
 	GasTableV0 = GasTable{
-		ExtcodeSize: 20,
-		ExtcodeCopy: 20,
-		Balance:     20,
-		SLoad:       50,
-		Calls:       40,
+		ExtcodeSize: 0,
+		ExtcodeCopy: 0,
+		Balance:     0,
+		SLoad:       0,
+		Calls:       0,
 		Suicide:     0,
-		ExpByte:     10,
+		ExpByte:     0,
 	}
 )
 
