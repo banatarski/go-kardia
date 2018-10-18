@@ -21,41 +21,41 @@ package configs
 const (
 	GenesisGasLimit uint64 = 0 // Gas limit of the Genesis block.
 
-	CallValueTransferGas  uint64 = 0  // Paid for CALL when the value transfer is non-zero.
+	CallValueTransferGas  uint64 = 0 // Paid for CALL when the value transfer is non-zero.
 	CallNewAccountGas     uint64 = 0 // Paid for CALL when the destination address didn't exist prior.
-	TxGas                 uint64 = 0     // Per transaction not creating a contract. NOTE: Not payable on data of calls between transactions.
+	TxGas                 uint64 = 0 // Per transaction not creating a contract. NOTE: Not payable on data of calls between transactions.
 	TxGasContractCreation uint64 = 0 // Per transaction that creates a contract. NOTE: Not payable on data of calls between transactions.
 
-	QuadCoeffDiv     uint64 = 512   // Divisor for the quadratic particle of the memory cost equation.
-	SstoreSetGas     uint64 = 0 // Once per SLOAD operation.
-	LogDataGas       uint64 = 0     // Per byte in a LOG* operation's data.
+	QuadCoeffDiv     uint64 = 512  // Divisor for the quadratic particle of the memory cost equation.
+	SstoreSetGas     uint64 = 0    // Once per SLOAD operation.
+	LogDataGas       uint64 = 0    // Per byte in a LOG* operation's data.
 	Sha3Gas          uint64 = 0    // Once per SHA3 operation.
-	Sha3WordGas      uint64 = 0     // Once per word of the SHA3 operation's data.
-	SstoreResetGas   uint64 = 0 // Once per SSTORE operation if the zeroness changes from zero.
-	SstoreClearGas   uint64 = 0  // Once per SSTORE operation if the zeroness doesn't change.
-	SstoreRefundGas  uint64 = 0 // Once per SSTORE operation if the zeroness changes to zero.
-	MemoryGas        uint64 = 0     // Times the address of the (highest referenced byte in memory + 1). NOTE: referencing happens on read, write and in instructions such as RETURN and CALL.
-	CopyGas          uint64 = 0     //
-	StackLimit       uint64 = 1024  // Maximum size of VM stack allowed.
-	LogGas           uint64 = 0   // Per LOG* operation.
-	LogTopicGas      uint64 = 0   // Multiplied by the * of the LOG*, per LOG transaction. e.g. LOG0 incurs 0 * c_txLogTopicGas, LOG4 incurs 4 * c_txLogTopicGas.
-	CreateGas        uint64 = 0 // Once per CREATE operation & contract-creation transaction.
+	Sha3WordGas      uint64 = 0    // Once per word of the SHA3 operation's data.
+	SstoreResetGas   uint64 = 0    // Once per SSTORE operation if the zeroness changes from zero.
+	SstoreClearGas   uint64 = 0    // Once per SSTORE operation if the zeroness doesn't change.
+	SstoreRefundGas  uint64 = 0    // Once per SSTORE operation if the zeroness changes to zero.
+	MemoryGas        uint64 = 0    // Times the address of the (highest referenced byte in memory + 1). NOTE: referencing happens on read, write and in instructions such as RETURN and CALL.
+	CopyGas          uint64 = 0    //
+	StackLimit       uint64 = 1024 // Maximum size of VM stack allowed.
+	LogGas           uint64 = 0    // Per LOG* operation.
+	LogTopicGas      uint64 = 0    // Multiplied by the * of the LOG*, per LOG transaction. e.g. LOG0 incurs 0 * c_txLogTopicGas, LOG4 incurs 4 * c_txLogTopicGas.
+	CreateGas        uint64 = 0    // Once per CREATE operation & contract-creation transaction.
 	JumpdestGas      uint64 = 0    // Refunded gas, once per SSTORE operation if the zeroness changes to zero.
-	SuicideRefundGas uint64 = 0 // Refunded following a suicide operation.
-	CallStipend      uint64 = 0  // Free gas given at beginning of call.
-	CallCreateDepth  uint64 = 0  // Maximum depth of call/create stack.
-	CreateDataGas    uint64 = 0   //
-	TxDataNonZeroGas uint64 = 68    // Per byte of data attached to a transaction that is not equal to zero. NOTE: Not payable on data of calls between transactions.
-	TxDataZeroGas    uint64 = 4     // Per byte of data attached to a transaction that equals zero. NOTE: Not payable on data of calls between transactions.
+	SuicideRefundGas uint64 = 0    // Refunded following a suicide operation.
+	CallStipend      uint64 = 0    // Free gas given at beginning of call.
+	CallCreateDepth  uint64 = 1024 // Maximum depth of call/create stack.
+	CreateDataGas    uint64 = 0    //
+	TxDataNonZeroGas uint64 = 68   // Per byte of data attached to a transaction that is not equal to zero. NOTE: Not payable on data of calls between transactions.
+	TxDataZeroGas    uint64 = 4    // Per byte of data attached to a transaction that equals zero. NOTE: Not payable on data of calls between transactions.
 
 	MaxCodeSize = 24576 // Maximum bytecode to permit for a contract
 
 	// Precompiled contract gas prices
 	EcrecoverGas        uint64 = 0 // Elliptic curve sender recovery gas price
-	Sha256BaseGas       uint64 = 0   // Base price for a SHA256 operation
-	Sha256PerWordGas    uint64 = 0   // Per-word price for a SHA256 operation
-	Ripemd160BaseGas    uint64 = 0  // Base price for a RIPEMD160 operation
-	Ripemd160PerWordGas uint64 = 0  // Per-word price for a RIPEMD160 operation
-	IdentityBaseGas     uint64 = 0   // Base price for a data copy operation
-	IdentityPerWordGas  uint64 = 0    // Per-work price for a data copy operation
+	Sha256BaseGas       uint64 = 0 // Base price for a SHA256 operation
+	Sha256PerWordGas    uint64 = 0 // Per-word price for a SHA256 operation
+	Ripemd160BaseGas    uint64 = 0 // Base price for a RIPEMD160 operation
+	Ripemd160PerWordGas uint64 = 0 // Per-word price for a RIPEMD160 operation
+	IdentityBaseGas     uint64 = 0 // Base price for a data copy operation
+	IdentityPerWordGas  uint64 = 0 // Per-work price for a data copy operation
 )
