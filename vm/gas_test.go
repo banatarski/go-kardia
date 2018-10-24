@@ -16,7 +16,10 @@
 
 package vm
 
-import "testing"
+import (
+	"testing"
+	"github.com/kardiachain/go-kardia/configs"
+)
 
 func TestMemoryGasCost(t *testing.T) {
 	//size := uint64(math.MaxUint64 - 64)
@@ -25,8 +28,12 @@ func TestMemoryGasCost(t *testing.T) {
 	if err != nil {
 		t.Error("didn't expect error:", err)
 	}
-	if v != 36028899963961341 {
+	if configs.TxGas != 0 && v != 36028899963961341 {
 		t.Errorf("Expected: 36028899963961341, got %d", v)
+	}
+
+	if configs.TxGas == 0 && v != 36028796884746240 {
+		t.Errorf("Expected: 36028796884746240, got %d", v)
 	}
 
 	_, err = memoryGasCost(&Memory{}, size+1)
