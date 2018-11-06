@@ -20,7 +20,7 @@ package kai
 
 import (
 	"github.com/kardiachain/go-kardia/blockchain"
-	"github.com/kardiachain/go-kardia/blockchain/dual"
+	"github.com/kardiachain/go-kardia/dual/blockchain"
 )
 
 // DefaultConfig contains default settings for use on the Kardia main net.
@@ -64,6 +64,9 @@ type DualConfig struct {
 	// The genesis block of dual blockchain, which is inserted if the database is empty.
 	// If nil, the Dual main net block is used.
 	DualGenesis *dual.DualGenesis `toml:",omitempty"`
+
+	// Dual's event pool options
+	DualEventPool dual.EventPoolConfig
 
 	// chaindata
 	ChainData string
