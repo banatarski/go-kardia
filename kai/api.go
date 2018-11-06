@@ -225,6 +225,23 @@ func (a *PublicTransactionAPI) SendRawTransaction(ctx context.Context, txs strin
 	return tx.Hash().Hex(), a.s.TxPool().AddRemote(tx)
 }
 
+// SendRawTransactions decode encoded data into tx and then add tx into pool
+func (a *PublicTransactionAPI) SendRawTransactions(ctx context.Context, txs ...string) ([]string, error) {
+	log.Info("SendRawTransaction", "data", txs)
+	if len(txs) > 0 {
+		results := make([]string, 0)
+		for _, tx := range txs {
+			if hash, err := a.SendRawTransaction(ctx, tx); err != nil {
+				return results, err
+			} else {
+				results = append(results, hash)
+			}
+
+		}
+	}
+	return nil, nil
+}
+
 // KardiaCall execute a contract method call only against
 // state on the local node. No tx is generated and submitted
 // onto the blockchain
