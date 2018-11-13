@@ -322,8 +322,10 @@ func (st *StateTransition) TransitionDb() (ret []byte, usedGas uint64, failed bo
 			return nil, 0, false, vmerr
 		}
 	}
-	st.refundGas()
-	st.state.AddBalance(st.kvm.Coinbase, new(big.Int).Mul(new(big.Int).SetUint64(st.gasUsed()), st.gasPrice))
+
+	// because we are private chain with zero free, we don't charge anything here
+	// st.refundGas()
+	// st.state.AddBalance(st.kvm.Coinbase, new(big.Int).Mul(new(big.Int).SetUint64(st.gasUsed()), st.gasPrice))
 
 	return ret, st.gasUsed(), vmerr != nil, err
 }
