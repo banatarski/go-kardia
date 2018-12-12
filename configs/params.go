@@ -48,7 +48,7 @@ const (
 	TxDataNonZeroGas uint64 = 68   // Per byte of data attached to a transaction that is not equal to zero. NOTE: Not payable on data of calls between transactions.
 	TxDataZeroGas    uint64 = 4    // Per byte of data attached to a transaction that equals zero. NOTE: Not payable on data of calls between transactions.
 
-	MaxCodeSize = 24576 // Maximum bytecode to permit for a contract
+	MaxCodeSize = 49152 // Maximum bytecode to permit for a contract
 
 	// Precompiled contract gas prices
 	EcrecoverGas        uint64 = 0 // Elliptic curve sender recovery gas price
