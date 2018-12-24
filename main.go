@@ -91,6 +91,7 @@ type flagArgs struct {
 	txs            bool
 	txsDelay       int
 	numTxs         int
+	group          int
 }
 
 var args flagArgs
@@ -142,6 +143,7 @@ func init() {
 	flag.BoolVar(&args.txs, "txs", false, "generate random transfer txs")
 	flag.IntVar(&args.txsDelay, "txsDelay", 10, "delay in seconds between batches of generated txs")
 	flag.IntVar(&args.numTxs, "numTxs", 10, "number of of generated txs in one batch")
+	flag.IntVar(&args.group, "group", 1, "group of accounts: group 1 contains account 1 to 33, group 1 contains account 34 to 66, group 1 contains account 67 to 99")
 }
 
 // runtimeSystemSettings optimizes process setting for go-kardia
@@ -505,7 +507,7 @@ func main() {
 	go displayKardiaPeers(n)
 
 	if args.dev && args.txs {
-		go genTxsLoop(args.numTxs, kardiaService.TxPool())
+		go genTxsLoop(args.numTxs, args.group, kardiaService.TxPool())
 	}
 
 	waitForever()
@@ -533,21 +535,21 @@ func displaySyncStatus(client *eth.EthClient) {
 
 // genTxsLoop generate & add a batch of transfer txs, repeat after delay flag.
 // Warning: Set txsDelay < 5 secs may build up old subroutines because previous subroutine to add txs won't be finished before new one starts.
-func genTxsLoop(numTxs int, txPool *blockchain.TxPool) {
+func genTxsLoop(numTxs int, group int, txPool *blockchain.TxPool) {
 	genTool := tool.NewGeneratorTool()
 	time.Sleep(60 * time.Second)
 	genRound := 0
 	for {
-		go genTxs(genTool, numTxs, txPool, genRound)
+		go genTxs(genTool, numTxs, group, txPool, genRound)
 		genRound++
 		time.Sleep(time.Duration(args.txsDelay) * time.Second)
 	}
 }
 
-func genTxs(genTool *tool.GeneratorTool, numTxs int, txPool *blockchain.TxPool, genRound int) {
+func genTxs(genTool *tool.GeneratorTool, numTxs int, group int, txPool *blockchain.TxPool, genRound int) {
 	goodCount := 0
 	badCount := 0
-	txList := genTool.GenerateTx(numTxs)
+	txList := genTool.GenerateTx(numTxs, group)
 	log.Info("GenTxs Adding new transactions", "num", numTxs, "genRound", genRound)
 	errs := txPool.AddLocals(txList)
 	for _, err := range errs {

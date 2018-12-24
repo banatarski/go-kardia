@@ -59,22 +59,34 @@ func NewGeneratorTool() *GeneratorTool {
 
 // GenerateTx generate an array of transfer transactions within genesis accounts.
 // numTx: number of transactions to send, default to 10.
-func (genTool *GeneratorTool) GenerateTx(numTx int) []*types.Transaction {
+func (genTool *GeneratorTool) GenerateTx(numTx int, group int) []*types.Transaction {
 	if numTx <= 0 {
 		numTx = defaultNumTx
 	}
 	result := make([]*types.Transaction, numTx)
-	addrKeySize := len(dev.GenesisAddrKeys)
+	//addrKeySize := len(dev.GenesisAddrKeys)
 	var keys []*ecdsa.PrivateKey
 	var addresses []common.Address
 
-	for addrS, privateKey := range dev.GenesisAddrKeys {
+	var genesisAddrKeys map[string]string
+	if group == 1 {
+		genesisAddrKeys = dev.GenesisAddrKeys1
+	} else if group == 2 {
+		genesisAddrKeys = dev.GenesisAddrKeys2
+	} else {
+		genesisAddrKeys = dev.GenesisAddrKeys3
+	}
+	addrKeySize := len(genesisAddrKeys)
+	for addrS, privateKey := range genesisAddrKeys {
 		pkByte, _ := hex.DecodeString(privateKey)
 		keys = append(keys, crypto.ToECDSAUnsafe(pkByte))
 		addresses = append(addresses, common.HexToAddress(addrS))
 	}
 
+	//groupSize := addrKeySize / 3
+	//from := (group - 1) * groupSize
 	genTool.mu.Lock()
+
 	for i := 0; i < numTx; i++ {
 		senderKey := keys[i%addrKeySize]
 		toAddr := addresses[(i+1)%addrKeySize]
@@ -97,6 +109,7 @@ func (genTool *GeneratorTool) GenerateTx(numTx int) []*types.Transaction {
 		nonce += 1
 		genTool.nonceMap[senderAddrS] = nonce
 	}
+
 	genTool.mu.Unlock()
 	return result
 }
