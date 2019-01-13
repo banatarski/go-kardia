@@ -67,7 +67,7 @@ type NodeInfo struct {
 
 // NodeInfo returns infomation of current node
 func (s *PublicNodeAPI) NodeInfo() *NodeInfo {
-	info := &NodeInfo{
+	return &NodeInfo{
 		Name:       s.node.server.NodeInfo().Name,
 		Address:    crypto.PubkeyToAddress(s.node.config.NodeKey().PublicKey).Hex(),
 		Enode:      s.node.server.NodeInfo().Enode,
@@ -77,6 +77,4 @@ func (s *PublicNodeAPI) NodeInfo() *NodeInfo {
 		OS:         runtime.GOOS,
 		OSVer:      runtime.GOARCH,
 	}
-
-	return info
 }
