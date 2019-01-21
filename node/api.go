@@ -83,6 +83,6 @@ func (s *PublicNodeAPI) AddPeer(url string) (bool, error) {
 	return s.node.AddPeer(url)
 }
 
-func (s *PublicNodeAPI) IsFull() bool {
-	return s.node.server.IsFull()
+func (s *PublicNodeAPI) CheckFull() bool {
+	return s.node.server.CheckFull()
 }

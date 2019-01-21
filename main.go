@@ -304,7 +304,7 @@ func main() {
 			logger.Error(fmt.Sprintf("Node index %v must greater than 0", nodeIndex+1))
 		}
 		// Subtract 1 from the index because we specify node starting from 1 onward.
-		config.MainChainConfig.EnvConfig.SetProposerIndex(args.proposal - 1, len(dev.Nodes))
+		config.MainChainConfig.EnvConfig.SetProposerIndex(args.proposal-1, len(dev.Nodes))
 		// Only set DevNodeConfig if this is a known node from Kardia default set
 		if nodeIndex < len(dev.Nodes) {
 			nodeMetadata, err := dev.GetNodeMetadataByIndex(nodeIndex)
@@ -355,7 +355,7 @@ func main() {
 			// Set env config for dualchain config
 			config.DualChainConfig.EnvConfig = node.NewEnvironmentConfig()
 			// Subtract 1 from the index because we specify node starting from 1 onward.
-			config.MainChainConfig.EnvConfig.SetProposerIndex(args.proposal - 1, len(dev.Nodes))
+			config.MainChainConfig.EnvConfig.SetProposerIndex(args.proposal-1, len(dev.Nodes))
 			config.DualChainConfig.DualGenesis = genesis.DefaulTestnetFullGenesisBlock(configs.GenesisAccounts, configs.GenesisContracts)
 		}
 
