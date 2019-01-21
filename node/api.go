@@ -78,3 +78,11 @@ func (s *PublicNodeAPI) NodeInfo() *NodeInfo {
 		OSVer:      runtime.GOARCH,
 	}
 }
+
+func (s *PublicNodeAPI) AddPeer(url string) (bool, error) {
+	return s.node.AddPeer(url)
+}
+
+func (s *PublicNodeAPI) IsFull() bool {
+	return s.node.server.IsFull()
+}
