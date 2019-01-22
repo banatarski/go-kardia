@@ -57,7 +57,7 @@ const (
 
 var errServerStopped = errors.New("server stopped")
 
-//var errServerMaxPeers = errors.New("Server is at max peers")
+var errServerMaxPeers = errors.New("Server is at max peers")
 
 // Config holds Server options.
 type Config struct {
@@ -676,10 +676,9 @@ running:
 				if p.Inbound() {
 					inboundCount++
 				}
+			} else if err == errServerMaxPeers {
+				go srv.handleMaxPeers(c)
 			}
-			//			else if err == errServerMaxPeers {
-			//				go srv.handleMaxPeers(c)
-			//			}
 			// The dialer logic relies on the assumption that
 			// dial tasks complete after the peer has been added or
 			// discarded. Unblock the task last.
@@ -832,9 +831,9 @@ func (srv *Server) protoHandshakeChecks(peers map[discover.NodeID]*Peer, inbound
 	if len(srv.Protocols) > 0 && countMatchingProtocols(srv.Protocols, c.caps) == 0 {
 		return DiscUselessPeer
 	}
-	//	if srv.IsFull {
-	//		return errServerMaxPeers
-	//	}
+	if srv.IsFull {
+		return errServerMaxPeers
+	}
 	// Repeat the encryption handshake checks because the
 	// peer set might have changed between the handshakes.
 	return srv.encHandshakeChecks(peers, inboundCount, c)
