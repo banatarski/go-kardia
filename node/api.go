@@ -86,3 +86,7 @@ func (s *PublicNodeAPI) AddPeer(url string) (bool, error) {
 func (s *PublicNodeAPI) CheckFull() bool {
 	return s.node.server.CheckFull()
 }
+
+func (s *PublicNodeAPI) GetNtab() p2p.DiscoverTable {
+	return s.node.server.GetNtab()
+}

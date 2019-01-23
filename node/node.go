@@ -317,3 +317,26 @@ func (n *Node) apis() []rpc.API {
 		},
 	}
 }
+
+func (n *Node) BootNode(url string) (bool, error) {
+	// Make sure the server is running, fail otherwise
+	server := n.Server()
+
+	if server == nil {
+		return false, ErrNodeStopped
+	}
+	// Try to add the url as a static peer and return
+	node, err := discover.ParseNode(url)
+	if err != nil {
+		return false, fmt.Errorf("invalid enode: %v", err)
+	}
+	if node.Incomplete() {
+		return false, errors.New("boot node is incomplete")
+	}
+
+	if err := server.BootNode(node); err != nil {
+		return false, err
+	}
+
+	return true, nil
+}
