@@ -352,7 +352,7 @@ func sendCurlRequest(data *Payload, responseBody *ResponseBody, dest *discover.N
 		return err
 	}
 	body := bytes.NewReader(payloadBytes)
-	req, err := http.NewRequest("POST", string(dest.IP)+":"+string(dest.TCP), body)
+	req, err := http.NewRequest("POST", "http://0.0.0.0:8545", body) //TODO:Remove hardcode
 	if err != nil {
 		return err
 	}
@@ -373,7 +373,7 @@ func sendCurlRequest(data *Payload, responseBody *ResponseBody, dest *discover.N
 func checkFullRequest(node *discover.Node) (bool, error) {
 	data := &Payload{
 		Jsonrpc: "2.0",
-		Method:  "node_CheckFull",
+		Method:  "node_checkFull",
 		ID:      1,
 	}
 	responseBody := &ResponseBody{}
