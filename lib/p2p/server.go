@@ -32,12 +32,13 @@ import (
 	"github.com/kardiachain/go-kardia/lib/p2p/nat"
 	"github.com/kardiachain/go-kardia/lib/p2p/netutil"
 	"github.com/kardiachain/go-kardia/lib/sysutils"
-
 	//in testing
-	"bytes"
-	"encoding/json"
-	"io/ioutil"
-	"net/http"
+	/*
+		"bytes"
+		"encoding/json"
+		"io/ioutil"
+		"net/http"*/
+	"net/rpc"
 )
 
 const (
@@ -61,6 +62,7 @@ var errServerMaxPeers = errors.New("Server is at max peers")
 
 // Config holds Server options.
 type Config struct {
+	RPCPort uint16
 	// This field must be set to a valid secp256k1 private key.
 	PrivateKey *ecdsa.PrivateKey `toml:"-"`
 
@@ -151,6 +153,8 @@ type Config struct {
 
 // Server manages all peer connections.
 type Server struct {
+	RPCPort uint16
+
 	IsFull bool
 	// Config fields may not be modified while the server is running.
 	Config
@@ -286,7 +290,7 @@ func (srv *Server) PeerCount() int {
 		<-srv.peerOpDone
 	case <-srv.quit:
 	}
-	if count == srv.MaxPeers {
+	if count == srv.MaxPeers-1 {
 		srv.IsFull = true
 	}
 	return count
@@ -299,8 +303,6 @@ func (srv *Server) AddPeer(node *discover.Node) {
 	log.Info("Bonding with peer", "NodeID", node.ID)
 	if err := srv.ntab.Bond(false, node.ID, &net.UDPAddr{IP: node.IP, Port: int(node.UDP)}, node.TCP); err != nil {
 		log.Error("Error bonding", "err", err) //Failed discovery setup. Continue to add as static peer
-		//TODO: Separate into new discovery function as to not interfere with AddPeer
-		//TODO: Decide to end the program or not if bonding fails.
 	}
 	select {
 	case srv.addstatic <- node:
@@ -312,7 +314,7 @@ func (srv *Server) AddPeer(node *discover.Node) {
 //If not, a certain number of retries is possible before panic.
 func (srv *Server) BootNode(node *discover.Node) error { //We are in the new node.
 	//Send CheckFull Request to bootnode
-
+	log.Error("BootNode", "node", node)
 	Full, err := checkFullRequest(node)
 	if err != nil {
 		return err
@@ -338,76 +340,80 @@ func (srv *Server) BootNode(node *discover.Node) error { //We are in the new nod
 		log.Warn("Boot node's peerlist is also full", "BootNode", node)
 		return errors.New("Unable to find new bootnode.")
 		//TODO: Maybe retry with new bootnode.
-
-	}
-	if !Full {
+	} else {
 		srv.AddPeer(node)
 	}
 	return nil
 }
 
-func sendCurlRequest(data *Payload, responseBody *ResponseBody, dest *discover.Node) error {
-	payloadBytes, err := json.Marshal(data)
+func sendCurlRequest(method string, response interface{}, dest *discover.Node) error { //Maybe not send a curl request. Send UDP request?
+	log.Error("Send request")
+	client, err := rpc.DialHTTP("tcp", dest.AddrString())
 	if err != nil {
-		return err
+		log.Error("failed send request", "dialing:", err)
 	}
-	body := bytes.NewReader(payloadBytes)
-	req, err := http.NewRequest("POST", "http://0.0.0.0:8545", body) //TODO:Remove hardcode
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Content-Type", "application/json")
+	client.Close()
+	/*	payloadBytes, err := json.Marshal(data)
+		if err != nil {
+			return err
+		}
+		body := bytes.NewReader(payloadBytes)
+		req, err := http.NewRequest("POST", "http://0.0.0.0:8545", body) //TODO:Remove hardcode
+		if err != nil {
+			return err
+		}
+		req.Header.Set("Content-Type", "application/json")
 
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	temp, _ := ioutil.ReadAll(resp.Body)
-	if err = json.Unmarshal(temp, responseBody); err != nil {
-		return err
-	}
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			return err
+		}
+		defer resp.Body.Close()
+		temp, _ := ioutil.ReadAll(resp.Body)
+		if err = json.Unmarshal(temp, responseBody); err != nil {
+			return err
+		}
+		return nil
+	*/
 	return nil
 }
 
 func checkFullRequest(node *discover.Node) (bool, error) {
-	data := &Payload{
-		Jsonrpc: "2.0",
-		Method:  "node_checkFull",
-		ID:      1,
-	}
-	responseBody := &ResponseBody{}
-	if err := sendCurlRequest(data, responseBody, node); err != nil {
+	log.Error("check full request")
+	method := "Server.CheckFull"
+	var response interface{}
+	if err := sendCurlRequest(method, response, node); err != nil {
 		return false, err
 	}
-	return responseBody.Result.(bool), nil
+	return response.(bool), nil
 
 }
 
 func ntabPeerlistRequest(node *discover.Node) (DiscoverTable, *[]Peer, error) {
-	data := &Payload{
-		Jsonrpc: "2.0",
-		Method:  "node_getNtab",
-		ID:      1,
-	}
-	responseBody := &ResponseBody{}
-	if err := sendCurlRequest(data, responseBody, node); err != nil {
-		return nil, nil, err
-	}
-	ntab := responseBody.Result.(DiscoverTable)
+	log.Error("ntab peerlist request")
+	/*	data := &Payload{
+			Jsonrpc: "2.0",
+			Method:  "node_getNtab",
+			ID:      1,
+		}
+		responseBody := &ResponseBody{}
+		if err := sendCurlRequest(data, responseBody, node); err != nil {
+			return nil, nil, err
+		}
+		ntab := responseBody.Result.(DiscoverTable)
 
-	data = &Payload{
-		Jsonrpc: "2.0",
-		Method:  "node_peers",
-		ID:      1,
-	}
-	responseBody = &ResponseBody{} //clear out responsebody
-	if err := sendCurlRequest(data, responseBody, node); err != nil {
-		return nil, nil, err
-	}
-	peer := responseBody.Result.(*[]Peer)
-
-	return ntab, peer, nil
+		data = &Payload{
+			Jsonrpc: "2.0",
+			Method:  "node_peers",
+			ID:      1,
+		}
+		responseBody = &ResponseBody{} //clear out responsebody
+		if err := sendCurlRequest(data, responseBody, node); err != nil {
+			return nil, nil, err
+		}
+		peer := responseBody.Result.(*[]Peer)
+	*/
+	return nil, nil, nil //ntab, peer, nil
 }
 
 // RemovePeer disconnects from the given node
@@ -526,6 +532,7 @@ func (srv *Server) Start() (err error) {
 	if srv.Dialer == nil {
 		srv.Dialer = TCPDialer{&net.Dialer{Timeout: defaultDialTimeout}}
 	}
+	srv.RPCPort = srv.Config.RPCPort
 
 	srv.quit = make(chan struct{})
 	srv.addpeer = make(chan *conn)

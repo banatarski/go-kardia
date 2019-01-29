@@ -75,6 +75,10 @@ func (n *Node) addr() *net.UDPAddr {
 	return &net.UDPAddr{IP: n.IP, Port: int(n.UDP)}
 }
 
+func (n *Node) AddrString() string {
+	return n.IP.String() + ":" + strconv.Itoa(int(n.TCP))
+}
+
 // Incomplete returns true for nodes with no IP address.
 func (n *Node) Incomplete() bool {
 	return n.IP == nil

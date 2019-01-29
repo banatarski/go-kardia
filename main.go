@@ -343,11 +343,12 @@ func main() {
 		}
 	}
 
-	n, err := node.NewNode(config)
+	n, err := node.NewNode(config) //TODO: Change this to send connection to proxy with request
 	if err != nil {
 		logger.Error("Cannot create node", "err", err)
 		return
 	}
+	n.CallProxy("Startup", n.Server().Self(), nil)
 
 	n.RegisterService(kai.NewKardiaService)
 	if args.dualChain {
@@ -407,7 +408,7 @@ func main() {
 		for i := 0; i < config.MainChainConfig.EnvConfig.GetNodeSize(); i++ {
 			peerURL := config.MainChainConfig.EnvConfig.GetNodeMetadata(i).NodeID()
 			logger.Info("Adding static peer", "peerURL", peerURL)
-			success, err := n.AddPeer(peerURL)
+			success, err := n.AddPeer(peerURL) // Called through proxy
 			if !success {
 				logger.Error("Fail to add peer", "err", err, "peerUrl", peerURL)
 			}
@@ -418,7 +419,7 @@ func main() {
 			for i := 0; i < config.DualChainConfig.EnvConfig.GetNodeSize(); i++ {
 				peerURL := config.DualChainConfig.EnvConfig.GetNodeMetadata(i).NodeID()
 				logger.Info("Adding static peer", "peerURL", peerURL)
-				success, err := n.AddPeer(peerURL)
+				success, err := n.AddPeer(peerURL) //TODO: Change this to send connection to proxy with request
 				if !success {
 					logger.Error("Fail to add peer", "err", err, "peerUrl", peerURL)
 				}
@@ -428,7 +429,7 @@ func main() {
 
 	if args.bootNode != "" {
 		logger.Info("Adding Peer", "Boot Node:", args.bootNode)
-		success, err := n.BootNode(args.bootNode)
+		success, err := n.BootNode(args.bootNode) //TODO: Change this to send connection to proxy with request
 		if success {
 			logger.Info("Boot Node added successfully", "Node", args.bootNode)
 		} else {
@@ -441,7 +442,7 @@ func main() {
 		urls := strings.Split(args.peer, ",")
 		for _, peerURL := range urls {
 			logger.Info("Adding static peer", "peerURL", peerURL)
-			success, err := n.AddPeer(peerURL)
+			success, err := n.AddPeer(peerURL) //TODO: Change this to send connection to proxy with request
 			if !success {
 				logger.Error("Fail to add peer", "err", err, "peerUrl", peerURL)
 			}
