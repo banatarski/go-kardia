@@ -1126,7 +1126,6 @@ func (srv *Server) PeersInfo() []*PeerInfo {
 }
 
 func (srv *Server) CheckFull() bool {
-	log.Error("Check full")
 	return srv.IsFull
 }
 

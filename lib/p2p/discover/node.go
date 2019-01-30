@@ -34,6 +34,7 @@ import (
 
 	"github.com/kardiachain/go-kardia/lib/common"
 	"github.com/kardiachain/go-kardia/lib/crypto"
+	"github.com/kardiachain/go-kardia/lib/log"
 )
 
 const NodeIDBits = 512
@@ -169,6 +170,7 @@ func parseComplete(rawurl string) (*Node, error) {
 	if u.Scheme != "enode" {
 		return nil, errors.New("invalid URL scheme, want \"enode\"")
 	}
+	log.Error("parseComplete called", "url", rawurl)
 	// Parse the Node ID from the user portion.
 	if u.User == nil {
 		return nil, errors.New("does not contain node ID")

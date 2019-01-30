@@ -22,6 +22,7 @@ import (
 	"runtime"
 
 	"github.com/kardiachain/go-kardia/lib/crypto"
+	"github.com/kardiachain/go-kardia/lib/log"
 	"github.com/kardiachain/go-kardia/lib/p2p"
 	"github.com/kardiachain/go-kardia/lib/p2p/discover"
 )
@@ -81,7 +82,11 @@ func (s *PublicNodeAPI) NodeInfo() *NodeInfo {
 }
 
 func (s *PublicNodeAPI) ConfirmAddPeer(url string) { //TODO:Make this accessible to only the proxy
-	node, _ := discover.ParseNode(url) //Already vetted for errors
+	log.Error("Adding Peer:", "url", url)
+	node, err := discover.ParseNode(url)
+	if err != nil {
+		panic(err)
+	}
 	s.node.ConfirmAddPeer(node)
 }
 

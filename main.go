@@ -348,7 +348,6 @@ func main() {
 		logger.Error("Cannot create node", "err", err)
 		return
 	}
-	n.CallProxy("Startup", n.Server().Self(), nil)
 
 	n.RegisterService(kai.NewKardiaService)
 	if args.dualChain {
@@ -401,8 +400,10 @@ func main() {
 	}
 	logger.Info("Genesis block", "genesis", *kardiaService.BlockChain().Genesis())
 
+	n.CallProxy("Startup", n.Server().Self(), nil) //Adds to proxy
+
 	// Connect with other peers.
-	if args.dev && args.bootNode == "" {
+	/*	if args.dev && args.bootNode == "" {
 
 		// Add Mainchain peers
 		for i := 0; i < config.MainChainConfig.EnvConfig.GetNodeSize(); i++ {
@@ -425,7 +426,7 @@ func main() {
 				}
 			}
 		}
-	}
+	}*/
 
 	if args.bootNode != "" {
 		logger.Info("Adding Peer", "Boot Node:", args.bootNode)

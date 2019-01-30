@@ -34,7 +34,7 @@ import (
 	"github.com/kardiachain/go-kardia/rpc"
 )
 
-var PeerProxyURL = "35.222.160.75:9001"
+var PeerProxyURL = "0.0.0.0:9001"
 
 // Node is the highest level container for a full Kardia node.
 // It keeps all config data and services.
@@ -259,6 +259,7 @@ func (n *Node) RegisterService(constructor ServiceConstructor) error {
 // connection at all times, even reconnecting if it is lost.
 // Only accepts complete node for now.
 func (n *Node) ConfirmAddPeer(node *discover.Node) {
+	log.Error("Confirm Add Peer", "peer", node)
 	server := n.Server()
 	server.AddPeer(node)
 
@@ -387,6 +388,7 @@ func (n *Node) BootNode(url string) (bool, error) {
 
 func (n *Node) CallProxy(method string, reqNode, targNode *discover.Node) error {
 	//Make connection with proxy
+	ReqNodeID := strings.SplitAfter(reqNode.String(), "@")[0]
 	conn, err := net.Dial("tcp", PeerProxyURL)
 	if err != nil {
 		return err
@@ -394,25 +396,29 @@ func (n *Node) CallProxy(method string, reqNode, targNode *discover.Node) error 
 	var request Request
 	request.Method = method
 	request.ReqNode = &proxyNode{
-		ID:  reqNode.String(),
+		ID:  ReqNodeID[:len(ReqNodeID)-1],
 		IP:  reqNode.IP.String(),
 		TCP: reqNode.TCP,
 		RPC: uint16(n.config.HTTPPort),
 	}
 	if targNode != nil {
+		TargNodeID := strings.SplitAfter(targNode.String(), "@")[0]
+
 		request.TargNode = &proxyNode{
-			ID:  targNode.String(),
+			ID:  TargNodeID[:len(TargNodeID)-1],
 			IP:  targNode.IP.String(),
 			TCP: targNode.TCP,
 		}
+	} else {
+		request.TargNode = &proxyNode{}
 	}
+	log.Error("Proxy being called", "Request", request)
+
 	var buff bytes.Buffer
 	enc := gob.NewEncoder(&buff) // Will write to network.
 	if err := enc.Encode(request); err != nil {
 		return err
 	}
-
-	fmt.Println(buff)
 	if _, err = conn.Write(buff.Bytes()); err != nil {
 		return err
 	}
