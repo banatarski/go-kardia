@@ -270,7 +270,7 @@ do
   run_cmd=
   if [ "$node_index" -le "$ETH_NODES" ]; then
       # cmd to run instance hosting Ethereum node
-      run_cmd="mkdir -p /var/kardiachain/node${node_index}/ethereum; docker run -d -p ${PORT}:${PORT} -p ${RPC_PORT}:${RPC_PORT} --name node${node_index} -v /var/kardiachain/node${node_index}/ethereum:/root/.ethereum ${KARDIA_GO_IMAGE} --dev --dual --dualchain --dualChainValIndexes ${DUAL_ETH_CHAIN_VAL_INDEXES} --mainChainValIndexes ${MAIN_CHAIN_VAL_INDEXES} --ethstat --ethstatname eth-dual-test-${node_index} --addr :${PORT} --name node${node_index} --rpc --rpcport ${RPC_PORT} --clearDataDir --peer ${peers}"      # instance 3 hosts kardia-scan frontend
+      run_cmd="mkdir -p /var/kardiachain/node${node_index}/ethereum; docker run -d -p ${PORT}:${PORT} -p ${RPC_PORT}:${RPC_PORT} --name node${node_index} -v /var/kardiachain/node${node_index}/ethereum:/root/.ethereum ${KARDIA_GO_IMAGE} --dev --dual --dualchain --dualChainValIndexes ${DUAL_ETH_CHAIN_VAL_INDEXES} --mainChainValIndexes ${MAIN_CHAIN_VAL_INDEXES} --ethstat --ethstatname eth-dual-test-${node_index} --addr :${PORT} --name node${node_index} --rpc --rpcport ${RPC_PORT} --clearDataDir --peer ${peers}"
       # instance 3 hosts kardia-scan frontend
       # use http://${public_ip}:8080 to see the kardia-scan frontend
       if [ "$node_index" -eq "$KARDIA_SCAN_NODE" ]; then

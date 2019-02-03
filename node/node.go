@@ -259,7 +259,6 @@ func (n *Node) RegisterService(constructor ServiceConstructor) error {
 // connection at all times, even reconnecting if it is lost.
 // Only accepts complete node for now.
 func (n *Node) ConfirmAddPeer(node *discover.Node) {
-	log.Error("Confirm Add Peer", "peer", node)
 	server := n.Server()
 	server.AddPeer(node)
 }
@@ -395,7 +394,6 @@ func (n *Node) CallProxy(method string, reqNode, targNode *discover.Node) error 
 	} else {
 		request.TargNode = &proxyNode{}
 	}
-	log.Error("Proxy being called", "Request", request)
 
 	var buff bytes.Buffer
 	enc := gob.NewEncoder(&buff) // Will write to network.
