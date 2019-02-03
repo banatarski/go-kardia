@@ -289,7 +289,7 @@ do
   else
       # cmd to run instance hosting Kardia node
       run_cmd="docker run -d -p ${PORT}:${PORT} -p ${RPC_PORT}:${RPC_PORT} --name node${node_index} ${KARDIA_GO_IMAGE} --dev --mainChainValIndexes ${MAIN_CHAIN_VAL_INDEXES} --addr :${PORT} --name node${node_index} --rpc --rpcport ${RPC_PORT} --clearDataDir --peer ${peers}"
-      fi
+  fi
 
   # SSH to instance
   (
