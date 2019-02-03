@@ -262,22 +262,6 @@ func (n *Node) ConfirmAddPeer(node *discover.Node) {
 	log.Error("Confirm Add Peer", "peer", node)
 	server := n.Server()
 	server.AddPeer(node)
-
-	/*	// Make sure the server is running, fail otherwise
-		server := n.Server()
-
-		if server == nil {
-			return false, ErrNodeStopped
-		}
-		// Try to add the url as a static peer and return
-		node, err := discover.ParseNode(url)
-		if err != nil {
-			return false, fmt.Errorf("invalid enode: %v", err)
-		}
-		if node.Incomplete() {
-			return false, errors.New("peer node is incomplete")
-		}
-	*/
 }
 
 type Request struct {
@@ -315,7 +299,6 @@ func (n *Node) AddPeer(url string) (bool, error) {
 	return true, nil
 	//Send an "AddPeer" request to proxy.
 	//Proxy will send a confirmed add peer request
-	//How do we know that it worked?
 }
 
 // Service returns running service with given type.

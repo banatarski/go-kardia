@@ -343,7 +343,7 @@ func main() {
 		}
 	}
 
-	n, err := node.NewNode(config) //TODO: Change this to send connection to proxy with request
+	n, err := node.NewNode(config)
 	if err != nil {
 		logger.Error("Cannot create node", "err", err)
 		return
@@ -400,10 +400,10 @@ func main() {
 	}
 	logger.Info("Genesis block", "genesis", *kardiaService.BlockChain().Genesis())
 
-	n.CallProxy("Startup", n.Server().Self(), nil) //Adds to proxy
+	n.CallProxy("Startup", n.Server().Self(), nil) //TODO: Change this to be activated by flag
 
 	// Connect with other peers.
-	/*	if args.dev && args.bootNode == "" {
+	if args.dev && args.bootNode == "" {
 
 		// Add Mainchain peers
 		for i := 0; i < config.MainChainConfig.EnvConfig.GetNodeSize(); i++ {
@@ -420,17 +420,17 @@ func main() {
 			for i := 0; i < config.DualChainConfig.EnvConfig.GetNodeSize(); i++ {
 				peerURL := config.DualChainConfig.EnvConfig.GetNodeMetadata(i).NodeID()
 				logger.Info("Adding static peer", "peerURL", peerURL)
-				success, err := n.AddPeer(peerURL) //TODO: Change this to send connection to proxy with request
+				success, err := n.AddPeer(peerURL)
 				if !success {
 					logger.Error("Fail to add peer", "err", err, "peerUrl", peerURL)
 				}
 			}
 		}
-	}*/
+	}
 
 	if args.bootNode != "" {
 		logger.Info("Adding Peer", "Boot Node:", args.bootNode)
-		success, err := n.BootNode(args.bootNode) //TODO: Change this to send connection to proxy with request
+		success, err := n.BootNode(args.bootNode)
 		if success {
 			logger.Info("Boot Node added successfully", "Node", args.bootNode)
 		} else {

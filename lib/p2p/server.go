@@ -32,13 +32,6 @@ import (
 	"github.com/kardiachain/go-kardia/lib/p2p/nat"
 	"github.com/kardiachain/go-kardia/lib/p2p/netutil"
 	"github.com/kardiachain/go-kardia/lib/sysutils"
-	//in testing
-	/*
-		"bytes"
-		"encoding/json"
-		"io/ioutil"
-		"net/http"*/
-	"net/rpc"
 )
 
 const (
@@ -58,11 +51,8 @@ const (
 
 var errServerStopped = errors.New("server stopped")
 
-var errServerMaxPeers = errors.New("Server is at max peers")
-
 // Config holds Server options.
 type Config struct {
-	RPCPort uint16
 	// This field must be set to a valid secp256k1 private key.
 	PrivateKey *ecdsa.PrivateKey `toml:"-"`
 
@@ -153,9 +143,6 @@ type Config struct {
 
 // Server manages all peer connections.
 type Server struct {
-	RPCPort uint16
-
-	IsFull bool
 	// Config fields may not be modified while the server is running.
 	Config
 
@@ -167,7 +154,7 @@ type Server struct {
 	lock    sync.Mutex // protects running
 	running bool
 
-	ntab         DiscoverTable
+	ntab         discoverTable
 	listener     net.Listener
 	ourHandshake *protoHandshake
 	lastLookup   time.Time
@@ -290,9 +277,6 @@ func (srv *Server) PeerCount() int {
 		<-srv.peerOpDone
 	case <-srv.quit:
 	}
-	if count == srv.MaxPeers-1 {
-		srv.IsFull = true
-	}
 	return count
 }
 
@@ -308,112 +292,6 @@ func (srv *Server) AddPeer(node *discover.Node) {
 	case srv.addstatic <- node:
 	case <-srv.quit:
 	}
-}
-
-// BootNode is used with the bootnode flag to try to connect to the given node.
-//If not, a certain number of retries is possible before panic.
-func (srv *Server) BootNode(node *discover.Node) error { //We are in the new node.
-	//Send CheckFull Request to bootnode
-	log.Error("BootNode", "node", node)
-	Full, err := checkFullRequest(node)
-	if err != nil {
-		return err
-	}
-
-	//If true, send request for ntab and peerslist.
-	if Full {
-		table, list, err := ntabPeerlistRequest(node)
-		if err != nil {
-			return err
-		}
-		//Resolve peers with ntab from bootnode.
-		for _, p := range *list {
-			peerNode := table.Resolve(p.ID())
-
-			if full, err := checkFullRequest(peerNode); err == nil && !full { //Checkfull with peers.
-				srv.AddPeer(peerNode) //Stop at first Checkfull = false
-				return nil
-			} else if err != nil {
-				return err
-			}
-		}
-		log.Warn("Boot node's peerlist is also full", "BootNode", node)
-		return errors.New("Unable to find new bootnode.")
-		//TODO: Maybe retry with new bootnode.
-	} else {
-		srv.AddPeer(node)
-	}
-	return nil
-}
-
-func sendCurlRequest(method string, response interface{}, dest *discover.Node) error { //Maybe not send a curl request. Send UDP request?
-	log.Error("Send request")
-	client, err := rpc.DialHTTP("tcp", dest.AddrString())
-	if err != nil {
-		log.Error("failed send request", "dialing:", err)
-	}
-	client.Close()
-	/*	payloadBytes, err := json.Marshal(data)
-		if err != nil {
-			return err
-		}
-		body := bytes.NewReader(payloadBytes)
-		req, err := http.NewRequest("POST", "http://0.0.0.0:8545", body) //TODO:Remove hardcode
-		if err != nil {
-			return err
-		}
-		req.Header.Set("Content-Type", "application/json")
-
-		resp, err := http.DefaultClient.Do(req)
-		if err != nil {
-			return err
-		}
-		defer resp.Body.Close()
-		temp, _ := ioutil.ReadAll(resp.Body)
-		if err = json.Unmarshal(temp, responseBody); err != nil {
-			return err
-		}
-		return nil
-	*/
-	return nil
-}
-
-func checkFullRequest(node *discover.Node) (bool, error) {
-	log.Error("check full request")
-	method := "Server.CheckFull"
-	var response interface{}
-	if err := sendCurlRequest(method, response, node); err != nil {
-		return false, err
-	}
-	return response.(bool), nil
-
-}
-
-func ntabPeerlistRequest(node *discover.Node) (DiscoverTable, *[]Peer, error) {
-	log.Error("ntab peerlist request")
-	/*	data := &Payload{
-			Jsonrpc: "2.0",
-			Method:  "node_getNtab",
-			ID:      1,
-		}
-		responseBody := &ResponseBody{}
-		if err := sendCurlRequest(data, responseBody, node); err != nil {
-			return nil, nil, err
-		}
-		ntab := responseBody.Result.(DiscoverTable)
-
-		data = &Payload{
-			Jsonrpc: "2.0",
-			Method:  "node_peers",
-			ID:      1,
-		}
-		responseBody = &ResponseBody{} //clear out responsebody
-		if err := sendCurlRequest(data, responseBody, node); err != nil {
-			return nil, nil, err
-		}
-		peer := responseBody.Result.(*[]Peer)
-	*/
-	return nil, nil, nil //ntab, peer, nil
 }
 
 // RemovePeer disconnects from the given node
@@ -440,7 +318,7 @@ func (srv *Server) Self() *discover.Node {
 	return srv.makeSelf(srv.listener, srv.ntab)
 }
 
-func (srv *Server) makeSelf(listener net.Listener, ntab DiscoverTable) *discover.Node {
+func (srv *Server) makeSelf(listener net.Listener, ntab discoverTable) *discover.Node {
 	// If the server's not running, return an empty node.
 	// If the node is running but discovery is off, manually assemble the node infos.
 	if ntab == nil {
@@ -532,7 +410,6 @@ func (srv *Server) Start() (err error) {
 	if srv.Dialer == nil {
 		srv.Dialer = TCPDialer{&net.Dialer{Timeout: defaultDialTimeout}}
 	}
-	srv.RPCPort = srv.Config.RPCPort
 
 	srv.quit = make(chan struct{})
 	srv.addpeer = make(chan *conn)
@@ -784,8 +661,6 @@ running:
 				if p.Inbound() {
 					inboundCount++
 				}
-			} else {
-				log.Error("Error adding peer", "err", err)
 			}
 			// The dialer logic relies on the assumption that
 			// dial tasks complete after the peer has been added or
@@ -831,25 +706,10 @@ running:
 	}
 }
 
-type Payload struct {
-	Jsonrpc string        `json:"jsonrpc"`
-	Method  string        `json:"method"`
-	Params  []interface{} `json:"params"`
-	ID      int           `json:"id"`
-}
-type ResponseBody struct {
-	Jsonrpc string      `json:"jsonrpc"`
-	ID      int         `json:"id"`
-	Result  interface{} `json:"result"`
-}
-
 func (srv *Server) protoHandshakeChecks(peers map[discover.NodeID]*Peer, inboundCount int, c *conn) error {
 	// Drop connections with no matching protocols.
 	if len(srv.Protocols) > 0 && countMatchingProtocols(srv.Protocols, c.caps) == 0 {
 		return DiscUselessPeer
-	}
-	if srv.IsFull {
-		return errServerMaxPeers
 	}
 	// Repeat the encryption handshake checks because the
 	// peer set might have changed between the handshakes.
@@ -1126,9 +986,5 @@ func (srv *Server) PeersInfo() []*PeerInfo {
 }
 
 func (srv *Server) CheckFull() bool {
-	return srv.IsFull
-}
-
-func (srv *Server) GetNtab() DiscoverTable {
-	return srv.ntab
+	return srv.PeerCount() >= srv.MaxPeers-1 //srv.IsFull
 }
