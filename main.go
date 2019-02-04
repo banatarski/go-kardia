@@ -461,13 +461,13 @@ func main() {
 
 		logger.Info("Adding Peer", "Boot Node:", args.bootNode)
 		if args.noProxy {
+			n.ConfirmAddPeer(bootNode)
+
+		} else {
 			success, err = n.BootNode(args.bootNode)
 			if !success {
-				logger.Error("Fail to connect to boot node", "err", err)
-				panic("Main Bootnode panic")
+				panic("Unable to connect to bootnode")
 			}
-		} else {
-			n.ConfirmAddPeer(bootNode)
 		}
 
 	}
