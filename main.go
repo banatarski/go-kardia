@@ -170,7 +170,7 @@ func init() {
 	flag.BoolVar(&args.txs, "txs", false, "generate random transfer txs")
 	flag.IntVar(&args.txsDelay, "txsDelay", 10, "delay in seconds between batches of generated txs")
 	flag.IntVar(&args.numTxs, "numTxs", 10, "number of of generated txs in one batch")
-	flag.BoolVar(&args.noProxy, "noProxy", false, "When triggered, Kardia node does not connect to proxy")
+	flag.BoolVar(&args.noProxy, "noProxy", false, "When triggered, Kardia node is standalone and is not registered in proxy.")
 }
 
 // runtimeSystemSettings optimizes process setting for go-kardia
@@ -420,9 +420,9 @@ func main() {
 				if err != nil {
 					logger.Error("Error parsing peerNode", "err", err)
 				}
-				n.ConfirmAddPeer(peerNode) // not called through proxy
+				n.ConfirmAddPeer(peerNode)
 			} else {
-				success, err = n.AddPeer(peerURL) // Called through proxy
+				success, err = n.AddPeer(peerURL)
 				if !success {
 					logger.Error("Fail to add peer", "err", err, "peerUrl", peerURL)
 				}
@@ -476,7 +476,7 @@ func main() {
 		urls := strings.Split(args.peer, ",")
 		for _, peerURL := range urls {
 			logger.Info("Adding static peer", "peerURL", peerURL)
-			success, err := n.AddPeer(peerURL) //TODO: Change this to send connection to proxy with request
+			success, err := n.AddPeer(peerURL)
 			if !success {
 				logger.Error("Fail to add peer", "err", err, "peerUrl", peerURL)
 			}

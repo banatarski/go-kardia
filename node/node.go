@@ -264,9 +264,9 @@ func (n *Node) ConfirmAddPeer(node *discover.Node) {
 }
 
 type Request struct {
-	Method   string
-	ReqNode  *proxyNode
-	TargNode *proxyNode
+	Method     string
+	ReqNode    *proxyNode
+	TargetNode *proxyNode
 }
 
 type proxyNode struct {
@@ -284,15 +284,15 @@ func (n *Node) AddPeer(url string) (bool, error) {
 	if server == nil {
 		return false, ErrNodeStopped
 	}
-	targNode, err := discover.ParseNode(url)
+	targetNode, err := discover.ParseNode(url)
 	if err != nil {
 		return false, fmt.Errorf("invalid enode: %v", err)
 	}
-	if targNode.Incomplete() {
+	if targetNode.Incomplete() {
 		return false, errors.New("peer node is incomplete")
 	}
 
-	if err := n.CallProxy("AddPeer", reqNode, targNode); err != nil {
+	if err := n.CallProxy("AddPeer", reqNode, targetNode); err != nil {
 		return false, err
 	}
 	return true, nil
@@ -344,14 +344,13 @@ func (n *Node) apis() []rpc.API {
 }
 
 func (n *Node) BootNode(url string) (bool, error) {
-	// Make sure the server is running, fail otherwise
 	server := n.Server()
-	reqNode := server.Self()
 
 	if server == nil {
 		return false, ErrNodeStopped
 	}
-	// Try to add the url as a static peer and return
+	reqNode := server.Self()
+
 	BootNode, err := discover.ParseNode(url)
 	if err != nil {
 		return false, fmt.Errorf("invalid enode: %v", err)
@@ -368,7 +367,7 @@ func (n *Node) BootNode(url string) (bool, error) {
 
 }
 
-func (n *Node) CallProxy(method string, reqNode, targNode *discover.Node) error {
+func (n *Node) CallProxy(method string, reqNode, targetNode *discover.Node) error {
 	//Make connection with proxy
 	ReqNodeID := strings.SplitAfter(reqNode.String(), "@")[0]
 	conn, err := net.Dial("tcp", PeerProxyURL)
@@ -383,16 +382,16 @@ func (n *Node) CallProxy(method string, reqNode, targNode *discover.Node) error 
 		TCP: reqNode.TCP,
 		RPC: uint16(n.config.HTTPPort),
 	}
-	if targNode != nil {
-		TargNodeID := strings.SplitAfter(targNode.String(), "@")[0]
 
-		request.TargNode = &proxyNode{
-			ID:  TargNodeID[:len(TargNodeID)-1],
-			IP:  targNode.IP.String(),
-			TCP: targNode.TCP,
+	request.TargetNode = &proxyNode{}
+	if targetNode != nil {
+		TargetNodeID := strings.SplitAfter(targetNode.String(), "@")[0]
+
+		request.TargetNode = &proxyNode{
+			ID:  TargetNodeID[:len(TargetNodeID)-1],
+			IP:  targetNode.IP.String(),
+			TCP: targetNode.TCP,
 		}
-	} else {
-		request.TargNode = &proxyNode{}
 	}
 
 	var buff bytes.Buffer
