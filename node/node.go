@@ -258,9 +258,12 @@ func (n *Node) RegisterService(constructor ServiceConstructor) error {
 // AddPeer adds a remote node as static peer, maintaining the new
 // connection at all times, even reconnecting if it is lost.
 // Only accepts complete node for now.
-func (n *Node) ConfirmAddPeer(node *discover.Node) {
+func (n *Node) ConfirmAddPeer(node *discover.Node) error {
 	server := n.Server()
-	server.AddPeer(node)
+	if err := server.AddPeer(node); err != nil {
+		return err
+	}
+	return nil
 }
 
 type Request struct {

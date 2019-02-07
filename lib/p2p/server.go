@@ -283,15 +283,16 @@ func (srv *Server) PeerCount() int {
 // AddPeer connects to the given node and maintains the connection until the
 // server is shut down. If the connection fails for any reason, the server will
 // attempt to reconnect the peer.
-func (srv *Server) AddPeer(node *discover.Node) {
+func (srv *Server) AddPeer(node *discover.Node) error {
 	log.Info("Bonding with peer", "NodeID", node.ID)
 	if err := srv.ntab.Bond(false, node.ID, &net.UDPAddr{IP: node.IP, Port: int(node.UDP)}, node.TCP); err != nil {
-		log.Error("Error bonding", "err", err) //Failed discovery setup. Continue to add as static peer
+		return err
 	}
 	select {
 	case srv.addstatic <- node:
 	case <-srv.quit:
 	}
+	return nil
 }
 
 // RemovePeer disconnects from the given node

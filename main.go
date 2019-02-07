@@ -420,7 +420,9 @@ func main() {
 				if err != nil {
 					logger.Error("Error parsing peerNode", "err", err)
 				}
-				n.ConfirmAddPeer(peerNode)
+				if err := n.ConfirmAddPeer(peerNode); err != nil {
+					log.Error("Error adding static peer", "err", err)
+				}
 			} else {
 				success, err = n.AddPeer(peerURL)
 				if !success {
@@ -440,7 +442,9 @@ func main() {
 					if err != nil {
 						logger.Error("Error parsing peerNode", "err", err)
 					}
-					n.ConfirmAddPeer(peerNode) // not called through proxy
+					if err := n.ConfirmAddPeer(peerNode); err != nil {
+						log.Error("Error adding static peer", "err", err)
+					}
 				} else {
 					success, err = n.AddPeer(peerURL) // Called through proxy
 					if !success {
@@ -461,7 +465,9 @@ func main() {
 
 		logger.Info("Adding Peer", "Boot Node:", args.bootNode)
 		if args.noProxy {
-			n.ConfirmAddPeer(bootNode)
+			if err := n.ConfirmAddPeer(bootNode); err != nil {
+				log.Error("Error adding bootNode", "err", err)
+			}
 
 		} else {
 			success, err = n.BootNode(args.bootNode)
