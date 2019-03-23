@@ -11,22 +11,22 @@ KARDIA_SCAN_IMAGE=gcr.io/strategic-ivy-130823/kardia-scan:latest
 NEO_API_SERVER_IMAGE=gcr.io/strategic-ivy-130823/neo_api_server_testnet:latest
 
 # Number of nodes and prefix name
-NODES=5
+NODES=20
 ETH_NODES=0
 NEO_NODES=0
-NAME_PREFIX="tienjoin3-"
+NAME_PREFIX="testnetjoin3-"
 
 # Indexes of Dual chain and main chain validator nodes
 DUAL_ETH_CHAIN_VAL_INDEXES="1,2,3"
 DUAL_NEO_CHAIN_VAL_INDEXES="4,5,6"
-MAIN_CHAIN_VAL_INDEXES="1,2,3,4,5,6,7,8"
+MAIN_CHAIN_VAL_INDEXES="1,2,3,4,5,6,7,8,9,10"
 
 # ports
 PORT=3000
 RPC_PORT=8545
 
 # Instance specs
-ZONE="us-west1-b"
+ZONE="us-central1-a"
 MACHINE_TYPE="n1-standard-1"
 IMAGE="cos-stable-70-11021-67-0"
 
@@ -258,10 +258,10 @@ do
 done
 
 # Concatenate addresses
-peers="enode://7f1c58d2a1627fc8767dab5cab2d317e638653a5e05b7e8b616c3745ca656a5e15f1221f7e13d18be7aff00aaae6c24ded8b7c2664f58fe63b6fa7350731e3e7@35.233.252.87:3000"
+peers="enode://02ab70ae28940c142003a57d6ba9fdda4f5fd2711df18b8ad8b9b151f30da452d7c3d2e98448707e45cc5277c805a5fda43f992ab9afa8e55adba2aa018f2071@35.184.223.103:3000"
 rpc_hosts=$(IFS=, ; echo "${public_ips[*]}")
 
-node_index=46
+node_index=81
 docker_cmd="docker pull ${KARDIA_GO_IMAGE}"
 for info in "${instances[@]}";
 do

@@ -11,15 +11,13 @@ KARDIA_SCAN_IMAGE=gcr.io/strategic-ivy-130823/kardia-scan:latest
 NEO_API_SERVER_IMAGE=gcr.io/strategic-ivy-130823/neo_api_server_testnet:latest
 
 # Number of nodes and prefix name
-NODES=15
-ETH_NODES=3
-NEO_NODES=3
-NAME_PREFIX="kardia-testnet-"
+NODES=40
+ETH_NODES=0
+NEO_NODES=0
+NAME_PREFIX="testnet-"
 
 # Indexes of Dual chain and main chain validator nodes
-DUAL_ETH_CHAIN_VAL_INDEXES="1,2,3"
-DUAL_NEO_CHAIN_VAL_INDEXES="4,5,6"
-MAIN_CHAIN_VAL_INDEXES="2,3,4,5,6,7,8"
+MAIN_CHAIN_VAL_INDEXES="1,2,3,4,5,6,7,8,9,10"
 
 # ports
 PORT=3000
@@ -34,6 +32,9 @@ IMAGE="cos-stable-70-11021-67-0"
 ETH_CUSTOM_CPU=2
 ETH_CUSTOM_MEMORY="10GB"
 ETH_BOOT_DISK_SIZE="50GB"
+
+# Index of instance sending traffic
+KARDIA_TRAFFIC_NODE=2
 
 # Index of instance hosting Kardia-scan
 KARDIA_SCAN_NODE=3
@@ -252,7 +253,7 @@ do
     IFS=: read -r name public_ip private_ip <<< "${instances[$i]}"
     # 10 seed nodes
     if [ $i -lt 10 ] ; then
-        addresses+=("${ENODES[$i]}${private_ip}:${PORT}")
+        addresses+=("${ENODES[$i]}${public_ip}:${PORT}")
     fi
     public_ips+=("http://${public_ip}:${RPC_PORT}")
 done
@@ -268,27 +269,18 @@ do
   IFS=: read -r name public_ip private_ip <<< "$info"
 
   run_cmd=
-  if [ "$node_index" -le "$ETH_NODES" ]; then
-      # cmd to run instance hosting Ethereum node
-      run_cmd="mkdir -p /var/kardiachain/node${node_index}/ethereum; docker run -d -p ${PORT}:${PORT}/udp -p ${PORT}:${PORT} -p ${RPC_PORT}:${RPC_PORT} --name node${node_index} -v /var/kardiachain/node${node_index}/ethereum:/root/.ethereum ${KARDIA_GO_IMAGE} --dev --dual --dualchain --dualChainValIndexes ${DUAL_ETH_CHAIN_VAL_INDEXES} --mainChainValIndexes ${MAIN_CHAIN_VAL_INDEXES} --ethstat --ethstatname eth-dual-test-${node_index} --addr :${PORT} --name node${node_index} --rpc --rpcport ${RPC_PORT} --clearDataDir --peer ${peers}"
-      # instance 3 hosts kardia-scan frontend
-      # use http://${public_ip}:8080 to see the kardia-scan frontend
-      if [ "$node_index" -eq "$KARDIA_SCAN_NODE" ]; then
-        run_cmd="$run_cmd;docker pull ${KARDIA_SCAN_IMAGE}; docker run -e "RPC_HOSTS=${rpc_hosts}" -e "publicIP=http://${public_ip}:8080" -p 8080:80 ${KARDIA_SCAN_IMAGE}"
-      fi
-  elif [ "$node_index" -le $((ETH_NODES + NEO_NODES)) ]; then
-      # cmd to run neo api server
-      # cmd to run instance hosting Neo node
-      run_cmd="docker run -d -p ${PORT}:${PORT}/udp -p ${PORT}:${PORT} -p ${RPC_PORT}:${RPC_PORT} --name node${node_index} ${KARDIA_GO_IMAGE} --dev --dualchain --neodual --dualChainValIndexes ${DUAL_NEO_CHAIN_VAL_INDEXES} --mainChainValIndexes ${MAIN_CHAIN_VAL_INDEXES} --addr :${PORT} --name node${node_index} --rpc --rpcport ${RPC_PORT} --clearDataDir --peer ${peers} --neoSubmitTxUrl=${NEO_API_URL} --neoCheckTxUrl=${NEO_CHECK_TX_URL} --neoReceiverAddress=${NEO_RECEIVER_ADDRESS}"
-      if [ "$node_index" -eq $((ETH_NODES + 1)) ]; then
-        NEO_API_URL=http://${public_ip}:5000
-        run_cmd="$run_cmd;docker pull ${NEO_API_SERVER_IMAGE}"
-        run_cmd="$run_cmd;docker run -d --name neo-api-server --env kardia=${KARDIA_URL} -p 5000:5000 -p 8080:8080 ${NEO_API_SERVER_IMAGE}"
-      fi
+  if [ "$node_index" -eq "$KARDIA_TRAFFIC_NODE" ]; then
+      # cmd to run instance hosting Kardia node with tx generation
+      run_cmd="docker run -d -p ${PORT}:${PORT}/udp -p ${PORT}:${PORT} -p ${RPC_PORT}:${RPC_PORT} --name node${node_index} ${KARDIA_GO_IMAGE} --dev --mainChainValIndexes ${MAIN_CHAIN_VAL_INDEXES} --addr :${PORT} --name node${node_index} --rpc --rpcport ${RPC_PORT} --clearDataDir --peer ${peers} --txs"
 
   else
       # cmd to run instance hosting Kardia node
       run_cmd="docker run -d -p ${PORT}:${PORT}/udp -p ${PORT}:${PORT} -p ${RPC_PORT}:${RPC_PORT} --name node${node_index} ${KARDIA_GO_IMAGE} --dev --mainChainValIndexes ${MAIN_CHAIN_VAL_INDEXES} --addr :${PORT} --name node${node_index} --rpc --rpcport ${RPC_PORT} --clearDataDir --peer ${peers}"
+  fi
+
+  if [ "$node_index" -eq "$KARDIA_SCAN_NODE" ]; then
+      # use http://${public_ip}:8080 to see the kardia-scan frontend
+        run_cmd="$run_cmd;docker pull ${KARDIA_SCAN_IMAGE}; docker run -e "RPC_HOSTS=${rpc_hosts}" -e "publicIP=http://${public_ip}:8080" -p 8080:80 ${KARDIA_SCAN_IMAGE}"
   fi
 
   # SSH to instance
