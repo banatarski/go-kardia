@@ -38,7 +38,7 @@ contract KardiaExchange {
         string indexed addr,
         string matchOrderId,
         uint256 _value
-);
+    );
 
     // if 1 eth = 10 neo, then sale_amount = 1, receive_amount = 10
     function addRate(string pair, uint sale_amount, uint receiveAmount) public {
@@ -74,6 +74,9 @@ contract KardiaExchange {
             if (totalMatched > 0) {
                 // calculate totalMatched back to original unit
                 order.availableAmount = amount - (totalMatched * r.sellAmount / r.receiveAmount);
+                if (order.availableAmount == 0) {
+                    removeOrder(originalTxId, srcPair);
+                }
             }
         }
         for (uint i = 0 ; i < releases.length; i ++) {
@@ -91,22 +94,28 @@ contract KardiaExchange {
         while (i < ids.length && totalMatched < receiveAmount ) {
             // if sourcePair is ETH-NEO, matchableAmount unit is NEO
             uint256 matchableAmount = receiveAmount > listOrders[ids[i]].availableAmount ? listOrders[ids[i]].availableAmount : receiveAmount;
-            ReleaseInfo memory r1 = ReleaseInfo(originalTxId, sourcePair, receiveAddress, "", matchableAmount, 0);
-            releases.push(r1);
-            uint256 matchableAmount2 = matchableAmount * r.sellAmount / r.receiveAmount;
-            // update availableAmount of matched order, if matchOrder is NEO-ETH, availableAmount unit is NEO)
-            listOrders[ids[i]].availableAmount -= matchableAmount;
-            ReleaseInfo memory r2 = ReleaseInfo(ids[i], destPair, listOrders[ids[i]].toAddress, "", matchableAmount2, 0);
-            releasesByID[ids[i]].push(r2);
-            releases.push(r2);
-            totalMatched += matchableAmount;
+            if (matchableAmount > 0) {
+                ReleaseInfo memory r1 = ReleaseInfo(originalTxId, sourcePair, receiveAddress, "", matchableAmount, 0);
+                releases.push(r1);
+                uint256 matchableAmount2 = matchableAmount * r.sellAmount / r.receiveAmount;
+                // update availableAmount of matched order, if matchOrder is NEO-ETH, availableAmount unit is NEO)
+                listOrders[ids[i]].availableAmount -= matchableAmount;
+                // remove order from the array
+                if (listOrders[ids[i]].availableAmount == 0) {
+                    removeOrder(ids[i], destPair);
+                }
+                ReleaseInfo memory r2 = ReleaseInfo(ids[i], destPair, listOrders[ids[i]].toAddress, "", matchableAmount2, 0);
+                releasesByID[ids[i]].push(r2);
+                releases.push(r2);
+                totalMatched += matchableAmount;
+            }
             i++;
         }
         return (releases, totalMatched);
     }
 
     // Get order id from its details:
-    function getOrderId(string sourcePair, string fromAddress, string toAddress, uint256 amount) internal view returns (string) {
+    function getOrderId(string sourcePair, string fromAddress, string toAddress, uint256 amount) public view returns (string) {
         string[] memory ids = orderIDsByPairs[sourcePair];
         for (uint256 i = 0; i < ids.length; i++) {
             ExchangeOrder memory order = listOrders[ids[i]];
@@ -138,16 +147,27 @@ contract KardiaExchange {
                         if (keccak256(abi.encodePacked(releasesByID[matchedTxId][j].receiveAddress))
                             == keccak256(abi.encodePacked(receiveAddress)) && releasesByID[matchedTxId][j].releaseAmount == releaseAmount
                             && releasesByID[matchedTxId][j].status == 0) {
-                            releasesByID[matchedTxId][0].releaseTxId = releaseTxId;
-                            releasesByID[matchedTxId][0].status = 1;
+                            releasesByID[matchedTxId][j].releaseTxId = releaseTxId;
+                            releasesByID[matchedTxId][j].status = 1;
                         }
                     }
                 }
             }
         }
-
     }
 
+    // removeOrder removes order from orderIDsByPairs array
+    function removeOrder(string id, string pair) internal {
+        uint orderCount = orderIDsByPairs[pair].length;
+        bytes32 encodedOrderId = keccak256(abi.encodePacked(id));
+        for (uint i; i < orderCount; i++) {
+            if (keccak256(abi.encodePacked(orderIDsByPairs[pair][i])) == encodedOrderId) {
+                // replace the removed order by the last order in the list
+                orderIDsByPairs[pair][i] = orderIDsByPairs[pair][orderCount];
+                orderIDsByPairs[pair].length--;
+            }
+        }
+    }
     // Get 10 matchable amount by pair
     function getMatchableAmount(string pair) public view returns (uint256[] amounts) {
         string[] memory ids = orderIDsByPairs[pair];

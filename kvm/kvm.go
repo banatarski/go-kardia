@@ -20,12 +20,13 @@ package kvm
 
 import (
 	"math/big"
+	"sync/atomic"
 
 	"github.com/kardiachain/go-kardia/configs"
 	"github.com/kardiachain/go-kardia/lib/common"
 	"github.com/kardiachain/go-kardia/lib/crypto"
+	"github.com/kardiachain/go-kardia/lib/log"
 	"github.com/kardiachain/go-kardia/types"
-	"sync/atomic"
 )
 
 // emptyCodeHash is used by create to ensure deployment is disallowed to already
@@ -50,7 +51,12 @@ func run(kvm *KVM, contract *Contract, input []byte) ([]byte, error) {
 			return RunPrecompiledContract(p, input, contract)
 		}
 	}
-	return kvm.interpreter.Run(contract, input)
+	output, err :=  kvm.interpreter.Run(contract, input)
+	if err != nil {
+		log.Error("Execution revert here", "contract address", contract.Address().String(), "input", common.Encode(input),
+			"err", err)
+	}
+	return output, err
 }
 
 // Context provides the KVM with auxiliary information. Once provided
