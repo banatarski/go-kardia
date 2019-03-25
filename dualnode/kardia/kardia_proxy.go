@@ -178,6 +178,7 @@ func (p *KardiaProxy) SubmitTx(event *types.EventData) error {
 			log.Info("Submit Kardia's tx successfully", "txhash", tx.Hash().String())
 		}
 	}
+	log.Error("Submit to Kardia", "value", event.Data.TxValue, "method", event.Data.TxMethod)
 	return nil
 }
 
