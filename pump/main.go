@@ -424,7 +424,7 @@ func waitForever() {
 // genTxsLoop generate & add a batch of transfer txs, repeat after delay flag.
 // Warning: Set txsDelay < 5 secs may build up old subroutines because previous subroutine to add txs won't be finished before new one starts.
 func genTxsLoop(txPool *tx_pool.TxPool) {
-	time.Sleep(15 * time.Second)
+	time.Sleep(60 * time.Second) //decrease it if you want to test it locally
 	genRound := 0
 	for {
 		genTool := NewGeneratorTool(accounts)
