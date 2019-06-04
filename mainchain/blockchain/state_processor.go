@@ -266,9 +266,12 @@ func (st *StateTransition) preCheck() error {
 	// Make sure this transaction's nonce is correct.
 	if st.msg.CheckNonce() {
 		nonce := st.state.GetNonce(st.msg.From())
-		if nonce < st.msg.Nonce() {
-			return ErrNonceTooHigh
-		} else if nonce > st.msg.Nonce() {
+		//log.Info("PreCheck", "nonce", nonce, "from", st.msg.From().Hex(), "msg_nonce", st.msg.Nonce())
+		// NOTE(kiendn): this will limit multiple transactions per address
+		//if nonce < st.msg.Nonce() {
+		//	return ErrNonceTooHigh
+		//} else
+		if nonce > st.msg.Nonce() {
 			return tx_pool.ErrNonceTooLow
 		}
 	}
@@ -306,7 +309,8 @@ func (st *StateTransition) TransitionDb() (ret []byte, usedGas uint64, failed bo
 		ret, _, st.gas, vmerr = vm.Create(sender, st.data, st.gas, st.value)
 	} else {
 		// Increment the nonce for the next transaction
-		st.state.SetNonce(msg.From(), st.state.GetNonce(sender.Address())+1)
+		//st.state.SetNonce(msg.From(), st.state.GetNonce(sender.Address())+1)
+		st.state.SetNonce(msg.From(), msg.Nonce() + 1)
 		ret, st.gas, vmerr = vm.Call(sender, st.to(), st.data, st.gas, st.value)
 	}
 	if vmerr != nil {

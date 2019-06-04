@@ -318,15 +318,21 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		if err := msg.Decode(&txs); err != nil {
 			return errResp(ErrDecode, "msg %v: %v", msg, err)
 		}
+		newTxs := make([]*types.Transaction, 0)
 		for i, tx := range txs {
 			// Validate and mark the remote transaction
 			if tx == nil {
 				return errResp(ErrDecode, "transaction %d is nil", i)
 			}
-			p.MarkTransaction(tx.Hash())
+			if !p.knownTxs.Has(tx.Hash()) {
+				p.MarkTransaction(tx.Hash())
+				newTxs = append(newTxs, tx)
+			}
 		}
-		pm.txpool.AddRemotes(txs)
-		pm.logger.Trace("Transactions added to pool", "txs", txs)
+		if len(newTxs) > 0 {
+			pm.txpool.AddRemotes(txs)
+			//pm.logger.Trace("Transactions added to pool", "txs", newTxs)
+		}
 	case msg.Code == serviceconst.CsNewRoundStepMsg:
 		pm.logger.Trace("NewRoundStep message received")
 		pm.csReactor.ReceiveNewRoundStep(msg, p.Peer)
@@ -369,12 +375,9 @@ func (pm *ProtocolManager) syncTransactions(p *peer) {
 	pm.logger.Trace("Sync txns to new peer", "peer", p)
 	// TODO(thientn): sends transactions in chunks. This may send a large number of transactions.
 	// Breaks them to chunks here or inside AsyncSend to not overload the pipeline.
-	txsMap, _ := pm.txpool.Pending()
+	pendingTxs, _, _ := pm.txpool.Pending(0)
 	var txs types.Transactions
-
-	for _, list := range txsMap {
-		txs = append(txs, list...)
-	}
+	txs = append(txs, pendingTxs...)
 	if len(txs) == 0 {
 		return
 	}
@@ -403,7 +406,7 @@ func (pm *ProtocolManager) Broadcast(msg interface{}, msgType uint64) {
 
 	// If ok is true, then simplify the log
 	if ok {
-		pm.logger.Info("Start broadcast consensus message", "Height", v.Height, "Block", v.Block.String(), "msgType", msgType)
+		pm.logger.Info("Start broadcast consensus message", "Height", v.Height, "Block", v.Block.Height(), "msgType", msgType)
 	} else {
 		pm.logger.Info("Start broadcast consensus message", "msg", msg, "msgType", msgType)
 	}
@@ -427,8 +430,11 @@ func (pm *ProtocolManager) BroadcastTxs(txs types.Transactions) {
 		peers := pm.peers.PeersWithoutTx(tx.Hash())
 		for _, peer := range peers {
 			txset[peer] = append(txset[peer], tx)
+
+			// add tx to peer
+			peer.knownTxs.Add(tx.Hash())
 		}
-		pm.logger.Trace("Broadcast transaction", "hash", tx.Hash(), "recipients", len(peers))
+		//pm.logger.Trace("Broadcast transaction", "hash", tx.Hash(), "recipients", len(peers))
 	}
 	// FIXME include this again: peers = peers[:int(math.Sqrt(float64(len(peers))))]
 	for peer, txs := range txset {

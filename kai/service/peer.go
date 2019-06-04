@@ -290,6 +290,7 @@ func (p *peer) broadcast() {
 				return
 			}
 			p.logger.Trace("Transactions sent", "count", len(txs))
+			//p.SendTransactions(txs)
 
 		case <-p.terminated:
 			return
@@ -324,10 +325,18 @@ func (ps *peerSet) PeersWithoutTx(hash common.Hash) []*peer {
 
 // SendTransactions sends transactions to the peer, adds the txn hashes to known txn set.
 func (p *peer) SendTransactions(txs types.Transactions) error {
-	for _, tx := range txs {
-		p.knownTxs.Add(tx.Hash())
-	}
+	//for _, tx := range txs {
+	//	p.knownTxs.Add(tx.Hash())
+	//}
 	return p2p.Send(p.rw, serviceconst.TxMsg, txs)
+}
+
+func (p *peer) SendTransaction(tx *types.Transaction) {
+	txs := make(types.Transactions, 0)
+	txs = append(txs, tx)
+	if err := p2p.Send(p.rw, serviceconst.TxMsg, txs); err != nil {
+		p.logger.Error("sending transaction failed", "err", err, "tx", tx.Hash().Hex())
+	}
 }
 
 // AsyncSendTransactions queues list of transactions propagation to a remote
@@ -336,9 +345,9 @@ func (p *peer) AsyncSendTransactions(txs []*types.Transaction) {
 	// Tx will be actually sent in SendTransactions() trigger by broadcast() routine
 	select {
 	case p.queuedTxs <- txs:
-		for _, tx := range txs {
-			p.knownTxs.Add(tx.Hash())
-		}
+		//for _, tx := range txs {
+		//	p.knownTxs.Add(tx.Hash())
+		//}
 	default:
 		p.logger.Debug("Dropping transaction propagation", "count", len(txs))
 	}

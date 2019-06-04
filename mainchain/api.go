@@ -311,7 +311,7 @@ func (s *PublicKaiAPI) KardiaCall(ctx context.Context, call types.CallArgsJSON, 
 
 // PendingTransactions returns pending transactions
 func (a *PublicTransactionAPI) PendingTransactions() ([]*PublicTransaction, error) {
-	pending, err := a.s.TxPool().Pending()
+	pending, _, err := a.s.TxPool().Pending(0)
 	if err != nil {
 		return nil, err
 	}
@@ -319,11 +319,9 @@ func (a *PublicTransactionAPI) PendingTransactions() ([]*PublicTransaction, erro
 	transactions := make([]*PublicTransaction, 0, len(pending))
 
 	// loop through pending txs
-	for _, txs := range pending {
-		for _, tx := range txs {
-			jsonData := NewPublicTransaction(tx, common.Hash{}, 0, 0)
-			transactions = append(transactions, jsonData)
-		}
+	for _, tx := range pending {
+		jsonData := NewPublicTransaction(tx, common.Hash{}, 0, 0)
+		transactions = append(transactions, jsonData)
 	}
 
 	return transactions, nil
