@@ -7,6 +7,7 @@ RUN apt-get update && apt-get install -y libzmq3-dev
 ADD . .
 RUN curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
 RUN dep ensure
+WORKDIR /go/src/github.com/kardiachain/go-kardia/pump
 RUN go install
 WORKDIR /go/bin
-ENTRYPOINT ["./go-kardia"]
+ENTRYPOINT ["./pump"]
