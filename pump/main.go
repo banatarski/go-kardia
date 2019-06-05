@@ -76,6 +76,7 @@ type flagArgs struct {
 	txsDelay       int
 	index          int
 	genTxsPort     string
+	pumper         bool
 }
 
 type Response struct {
@@ -131,6 +132,7 @@ func init() {
 	flag.IntVar(&args.txsDelay, "txsDelay", 10, "delay in seconds between batches of generated txs")
 	flag.StringVar(&args.genTxsPort,"genTxsPort",":5000", "port of generate tx")
 	flag.IntVar(&args.index, "index", 1, "")
+	flag.BoolVar(&args.pumper, "pumper", true, "default is pumper")
 }
 
 // runtimeSystemSettings optimizes process setting for go-kardia
@@ -393,7 +395,9 @@ func main() {
 	}
 
 	// gen txs from args.numTxs
-	go genTxsLoop(kardiaService.TxPool())
+	if args.pumper {
+		go genTxsLoop(kardiaService.TxPool())
+	}
 
 	// start an api that receives pump configure
 	go func(){
