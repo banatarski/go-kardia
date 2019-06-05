@@ -395,7 +395,7 @@ func main() {
 	}
 
 	// gen txs from args.numTxs
-	if args.pumper {
+	if args.pumper == true {
 		go genTxsLoop(kardiaService.TxPool())
 	}
 
