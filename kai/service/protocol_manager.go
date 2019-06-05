@@ -375,9 +375,7 @@ func (pm *ProtocolManager) syncTransactions(p *peer) {
 	pm.logger.Trace("Sync txns to new peer", "peer", p)
 	// TODO(thientn): sends transactions in chunks. This may send a large number of transactions.
 	// Breaks them to chunks here or inside AsyncSend to not overload the pipeline.
-	pendingTxs, _, _ := pm.txpool.Pending(0)
-	var txs types.Transactions
-	txs = append(txs, pendingTxs...)
+	txs, _, _ := pm.txpool.Pending(0)
 	if len(txs) == 0 {
 		return
 	}
@@ -429,6 +427,10 @@ func (pm *ProtocolManager) BroadcastTxs(txs types.Transactions) {
 	for _, tx := range txs {
 		peers := pm.peers.PeersWithoutTx(tx.Hash())
 		for _, peer := range peers {
+			if _, ok := txset[peer]; !ok {
+				go peer.AsyncSendTransactions(txs)
+				txset[peer] = make(types.Transactions, 0)
+			}
 			txset[peer] = append(txset[peer], tx)
 
 			// add tx to peer
@@ -437,9 +439,9 @@ func (pm *ProtocolManager) BroadcastTxs(txs types.Transactions) {
 		//pm.logger.Trace("Broadcast transaction", "hash", tx.Hash(), "recipients", len(peers))
 	}
 	// FIXME include this again: peers = peers[:int(math.Sqrt(float64(len(peers))))]
-	for peer, txs := range txset {
-		peer.AsyncSendTransactions(txs)
-	}
+	//for peer, txs := range txset {
+	//	peer.AsyncSendTransactions(txs)
+	//}
 }
 
 // NodeInfo represents a short summary of the Kardia sub-protocol metadata
