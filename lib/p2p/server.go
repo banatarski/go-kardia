@@ -46,7 +46,7 @@ const (
 	frameReadTimeout = 60 * time.Second
 
 	// Maximum amount of time allowed for writing a complete message.
-	frameWriteTimeout = 40 * time.Second
+	frameWriteTimeout = 100 * time.Second
 )
 
 var errServerStopped = errors.New("server stopped")
