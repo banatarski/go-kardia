@@ -428,7 +428,7 @@ func (pm *ProtocolManager) BroadcastTxs(txs types.Transactions) {
 		peers := pm.peers.PeersWithoutTx(tx.Hash())
 		for _, peer := range peers {
 			if _, ok := txset[peer]; !ok {
-				go peer.AsyncSendTransactions(txs)
+				peer.AsyncSendTransactions(txs)
 				txset[peer] = make(types.Transactions, 0)
 			}
 			txset[peer] = append(txset[peer], tx)

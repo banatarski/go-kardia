@@ -333,11 +333,11 @@ func (p *peer) SendTransactions(txs types.Transactions) error {
 			to = len(txs)
 		}
 		txsToSend := txs[from:to]
-		go func() {
-			if err := p2p.Send(p.rw, serviceconst.TxMsg, txsToSend); err != nil {
-				p.logger.Error("sending transaction failed", "err", err, "txs", txsToSend)
-			}
-		}()
+		//go func() {
+		if err := p2p.Send(p.rw, serviceconst.TxMsg, txsToSend); err != nil {
+			p.logger.Error("sending transaction failed", "err", err, "txs", txsToSend)
+		}
+		//}()
 		for _, tx := range txsToSend {
 			p.knownTxs.Add(tx.Hash())
 		}
