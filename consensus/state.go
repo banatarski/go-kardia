@@ -28,8 +28,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ebuchman/fail-test"
-
 	cfg "github.com/kardiachain/go-kardia/configs"
 	cstypes "github.com/kardiachain/go-kardia/consensus/types"
 	"github.com/kardiachain/go-kardia/kai/state"
@@ -1147,11 +1145,10 @@ func (cs *ConsensusState) finalizeCommit(height *cmn.BigInt) {
 		"height", block.Height(), "hash", block.Hash().String())
 	//cs.logger.Info(cmn.Fmt("%v", block))
 
-	fail.Fail() // XXX
+	//fail.Fail() // XXX
 
 	// Save block.
 	if cs.blockOperations.Height() < block.Height() {
-
 		// Verifies that the block txs were already executed and committed to storage.
 		// If the new block state is not found in storage, execute & commit txs.
 		err := cs.blockOperations.CommitBlockTxsIfNotFound(block)
@@ -1170,7 +1167,7 @@ func (cs *ConsensusState) finalizeCommit(height *cmn.BigInt) {
 		cs.logger.Info("Calling finalizeCommit on already stored block", "height", block.Height())
 	}
 
-	fail.Fail() // XXX
+	//fail.Fail() // XXX
 
 	// Create a copy of the state for staging and an event cache for txs.
 	stateCopy := cs.state.Copy()
@@ -1188,12 +1185,13 @@ func (cs *ConsensusState) finalizeCommit(height *cmn.BigInt) {
 		return
 	}
 
-	fail.Fail() // XXX
+
+	//fail.Fail() // XXX
 
 	// NewHeightStep!
 	cs.updateToState(stateCopy)
 
-	fail.Fail() // XXX
+	//fail.Fail() // XXX
 
 	// cs.StartTime is already set.
 	// Schedule Round0 to start soon.

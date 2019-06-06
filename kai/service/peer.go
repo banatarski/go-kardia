@@ -326,7 +326,7 @@ func (ps *peerSet) PeersWithoutTx(hash common.Hash) []*peer {
 // SendTransactions sends transactions to the peer, adds the txn hashes to known txn set.
 func (p *peer) SendTransactions(txs types.Transactions) error {
 	from := 0
-	maxSize := 1000
+	maxSize := 10000
 	for {
 		to := from + maxSize
 		if to >= len(txs) {

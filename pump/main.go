@@ -76,7 +76,6 @@ type flagArgs struct {
 	txsDelay       int
 	index          int
 	genTxsPort     string
-	pumper         bool
 }
 
 type Response struct {
@@ -128,11 +127,10 @@ func init() {
 		"maximum number of network peers (network disabled if set to 0. Note that this flag only has effect when --dev flag is set")
 	flag.BoolVar(&args.noProxy, "noProxy", false, "When triggered, Kardia node is standalone and is not registered in proxy.")
 	flag.StringVar(&args.peerProxyIP, "peerProxyIP", "", "IP of the peer proxy for this node to register.")
-	flag.IntVar(&args.numTxs, "numTxs", 3000, "number of of generated txs in one batch")
-	flag.IntVar(&args.txsDelay, "txsDelay", 10, "delay in seconds between batches of generated txs")
+	flag.IntVar(&args.numTxs, "numTxs", 0, "number of of generated txs in one batch")
+	flag.IntVar(&args.txsDelay, "txsDelay", 1000, "delay in seconds between batches of generated txs")
 	flag.StringVar(&args.genTxsPort,"genTxsPort",":5000", "port of generate tx")
 	flag.IntVar(&args.index, "index", 1, "")
-	flag.BoolVar(&args.pumper, "pumper", true, "default is pumper")
 }
 
 // runtimeSystemSettings optimizes process setting for go-kardia
@@ -395,9 +393,7 @@ func main() {
 	}
 
 	// gen txs from args.numTxs
-	if args.pumper == true {
-		go genTxsLoop(kardiaService.TxPool())
-	}
+	go genTxsLoop(kardiaService.TxPool())
 
 	// start an api that receives pump configure
 	go func(){
@@ -439,13 +435,19 @@ func genTxsLoop(txPool *tx_pool.TxPool) {
 }
 
 func addRemote(txPool *tx_pool.TxPool, tx *types.Transaction, genTool *GeneratorTool) {
-	if err := txPool.AddRemote(tx); err != nil {
-		sender, err1 := types.Sender(tx)
-		if err1 != nil {
-			log.Error("addRemote - invalid sender", "err", err1)
-		} else {
-			log.Error("Add remote failed", "err", err, "tx", tx.Hash().Hex(),
-				"txNonce", tx.Nonce(), "sender", sender.Hex(), "senderNonce", genTool.GetNonce(sender.Hex()))
+	//if err := txPool.AddRemotes([]*types.Transaction{tx}); err != nil {
+	//	sender, err1 := types.Sender(tx)
+	//	if err1 != nil {
+	//		log.Error("addRemote - invalid sender", "err", err1)
+	//	} else {
+	//		log.Error("Add remote failed", "err", err, "tx", tx.Hash().Hex(),
+	//			"txNonce", tx.Nonce(), "sender", sender.Hex(), "senderNonce", genTool.GetNonce(sender.Hex()))
+	//	}
+	//}
+	errs := txPool.AddRemotes([]*types.Transaction{tx})
+	for _, err := range errs {
+		if err != nil {
+			log.Error("Add remote failed", "err", err, "tx", tx.Hash().Hex())
 		}
 	}
 }
@@ -459,7 +461,7 @@ func genTxs(genTool *GeneratorTool, numTxs int, txPool *tx_pool.TxPool, genRound
 	//for _, tx := range txList {
 	//	addRemote(txPool, tx, genTool)
 	//}
-	errs := txPool.AddLocals(txList)
+	errs := txPool.AddRemotes(txList)
 	for _, err := range errs {
 		if err != nil {
 			log.Error("Fail to add transaction list", "err", err)

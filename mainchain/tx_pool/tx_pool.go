@@ -215,7 +215,7 @@ type TxPool struct {
 	locals  *accountSet // Set of local transaction to exempt from eviction rules
 	journal *txJournal  // Journal of local transaction to back up to disk
 
-	pending map[common.Address]*types.Transactions   // All currently processable transactions
+	pending map[common.Address]types.Transactions   // All currently processable transactions
 	//queue   map[common.Address]*txList   // Queued but non-processable transactions
 	beats   map[common.Address]time.Time // Last heartbeat from each known account
 	all     *txLookup                    // All transactions to allow lookups
@@ -236,7 +236,7 @@ func NewTxPool(logger log.Logger, config TxPoolConfig, chainconfig *configs.Chai
 		config:      config,
 		chainconfig: chainconfig,
 		chain:       chain,
-		pending:     make(map[common.Address]*types.Transactions),
+		pending:     make(map[common.Address]types.Transactions),
 		//queue:       make(map[common.Address]*txList),
 		beats:       make(map[common.Address]time.Time),
 		all:         newTxLookup(100000), // hard code 100000 that allows caching only 100000 txs
@@ -297,10 +297,9 @@ func (pool *TxPool) loop() {
 		// Handle ChainHeadEvent
 		case ev := <-pool.chainHeadCh:
 			if ev.Block != nil {
-				pool.mu.Lock()
 				pool.reset(head.Header(), ev.Block.Header())
+				pool.mu.Lock()
 				head = ev.Block
-
 				pool.mu.Unlock()
 			}
 		// Be unsubscribed due to system stopped
@@ -415,6 +414,7 @@ func (pool *TxPool) reset(oldHead, newHead *types.Header) {
 	*/
 
 	// Initialize the internal state to the current head
+	pool.mu.Lock()
 	if newHead == nil {
 		newHead = pool.chain.CurrentBlock().Header() // Special case during testing
 	}
@@ -430,6 +430,12 @@ func (pool *TxPool) reset(oldHead, newHead *types.Header) {
 	pool.pendingState = state.ManageState(statedb)
 
 	pool.currentMaxGas = newHead.GasLimit
+
+	pool.mu.Unlock()
+	// get pending list in order to sort and update pending state
+	if _, _, err := pool.Pending(0); err != nil {
+		pool.logger.Error("reset - error while getting pending list", "err", err)
+	}
 
 	// Inject any transactions discarded due to reorgs
 	//pool.logger.Debug("Reinjecting stale transactions", "count", len(reinject))
@@ -450,7 +456,7 @@ func (pool *TxPool) reset(oldHead, newHead *types.Header) {
 
 	// Check the queue and move transactions over to the pending if possible
 	// or remove those that have become invalid
-	pool.promoteExecutables(nil)
+	//pool.promoteExecutables(nil)
 }
 
 // Stop terminates the transaction pool.
@@ -558,13 +564,13 @@ func (pool *TxPool) pendingValidation(tx *types.Transaction) error {
 	return nil
 }
 
-func removeTxsFromSlices(txs types.Transactions, indexes []int) *types.Transactions {
+func removeTxsFromSlices(txs types.Transactions, indexes []int) types.Transactions {
 	if len(indexes) == 0 || len(txs) == 0 {return nil}
 	sort.Ints(indexes)
 	newTxs := make(types.Transactions, 0)
 	if len(indexes) == 1 {
 		if indexes[0] > len(txs) {
-			return &newTxs
+			return newTxs
 		}
 		if indexes[0] == 0 {
 			newTxs = append(newTxs, txs[1:]...)
@@ -572,7 +578,11 @@ func removeTxsFromSlices(txs types.Transactions, indexes []int) *types.Transacti
 			newTxs = append(newTxs, txs[0:len(txs)-1]...)
 		} else {
 			newTxs = append(newTxs, txs[0:indexes[0]]...)
-			newTxs = append(newTxs, txs[indexes[0]+1:]...)
+			if indexes[0] + 1 < len(txs)-1 {
+				newTxs = append(newTxs, txs[indexes[0]+1:]...)
+			} else if indexes[0] + 1 < len(txs) {
+				newTxs = append(newTxs, txs[indexes[0]+1])
+			}
 		}
 	} else {
 		for i, idx := range indexes {
@@ -595,7 +605,7 @@ func removeTxsFromSlices(txs types.Transactions, indexes []int) *types.Transacti
 			}
 		}
 	}
-	return &newTxs
+	return newTxs
 }
 
 func (pool *TxPool) RemovePending(limit int) types.Transactions {
@@ -604,7 +614,7 @@ func (pool *TxPool) RemovePending(limit int) types.Transactions {
 	pool.mu.Lock()
 	for addr, idx := range indexes {
 		//pool.logger.Error("Remove Pending", "addr", addr.Hex(), "indexes", idx, "txs", len(*pool.pending[addr]))
-		pool.pending[addr] = removeTxsFromSlices(*pool.pending[addr], idx)
+		pool.pending[addr] = removeTxsFromSlices(pool.pending[addr], idx)
 	}
 	pool.mu.Unlock()
 	return txs
@@ -612,26 +622,27 @@ func (pool *TxPool) RemovePending(limit int) types.Transactions {
 
 func (pool *TxPool) RemoveTxsFromPending(txs types.Transactions) error {
 	pool.mu.Lock()
-	defer pool.mu.Unlock()
 
 	txLoop:
 	for _, tx := range txs {
 		addr, err := types.Sender(tx)
 		if err != nil {
+			pool.mu.Unlock()
 			return err
 		}
 
 		if _, ok := pool.pending[addr]; ok {
-			for i, pendingTx := range *pool.pending[addr] {
+			for i, pendingTx := range pool.pending[addr] {
 				if pendingTx.Hash() == tx.Hash() {
 					removedIndexes := make([]int, 0)
 					removedIndexes = append(removedIndexes, i)
-					pool.pending[addr] = removeTxsFromSlices(*pool.pending[addr], removedIndexes)
+					pool.pending[addr] = removeTxsFromSlices(pool.pending[addr], removedIndexes)
 					continue txLoop
 				}
 			}
 		}
 	}
+	pool.mu.Unlock()
 	return nil
 }
 
@@ -639,10 +650,8 @@ func (pool *TxPool) RemoveTxsFromPending(txs types.Transactions) error {
 // account and sorted by nonce. The returned transaction set is a copy and can be
 // freely modified by calling code.
 func (pool *TxPool) Pending(limit int) (types.Transactions, map[common.Address][]int, error) {
-	pool.mu.Lock()
-	defer pool.mu.Unlock()
 	pending := make(types.Transactions, 0)
-
+	pool.mu.Lock()
 	// indexes is found txs indexes in pool.pending
 	indexes := make(map[common.Address][]int, 0)
 	for addr, pendingTxs := range pool.pending {
@@ -661,7 +670,7 @@ func (pool *TxPool) Pending(limit int) (types.Transactions, map[common.Address][
 		nonces := make(map[uint64]bool)
 		indexes[addr] = make([]int, 0)
 
-		for i, tx := range *pendingTxs {
+		for i, tx := range pendingTxs {
 
 			if limit > 0 && len(pending) + len(txs) >= limit {
 				break
@@ -686,7 +695,7 @@ func (pool *TxPool) Pending(limit int) (types.Transactions, map[common.Address][
 		}
 
 		if len(removedIndexes) > 0 {
-			pool.pending[addr] = removeTxsFromSlices(*pendingTxs, removedIndexes)
+			pool.pending[addr] = removeTxsFromSlices(pendingTxs, removedIndexes)
 		}
 
 		if len(txs) > 0 {
@@ -697,6 +706,7 @@ func (pool *TxPool) Pending(limit int) (types.Transactions, map[common.Address][
 			pool.pendingState.SetNonce(addr, txs[len(txs)-1].Nonce()+1)
 		}
 	}
+	pool.mu.Unlock()
 	return pending, indexes, nil
 }
 
@@ -985,11 +995,11 @@ func (pool *TxPool) addTx(tx *types.Transaction, local bool) error {
 	txs := make(types.Transactions, 0)
 	from, _ := types.Sender(tx)
 	if pool.pending[from] != nil {
-		txs = *pool.pending[from]
+		txs = pool.pending[from]
 	}
 
 	txs = append(txs, tx)
-	pool.pending[from] = &txs
+	pool.pending[from] = txs
 
 	// add tx to all
 	if pool.all.Get(tx.Hash()) == nil {
@@ -1018,11 +1028,9 @@ func (pool *TxPool) addTxs(txs []*types.Transaction, local bool) []error {
 	promoted := make([]*types.Transaction, 0)
 
 	for i, tx := range txs {
-
 		if tx == nil {
 			continue
 		}
-
 		errs[i] = pool.addTx(tx, local)
 		if errs[i] == nil {
 			promoted = append(promoted, tx)
@@ -1032,6 +1040,7 @@ func (pool *TxPool) addTxs(txs []*types.Transaction, local bool) []error {
 	if len(promoted) > 0 {
 		go pool.txFeed.Send(events.NewTxsEvent{Txs: promoted})
 	}
+
 	return errs
 }
 
@@ -1093,12 +1102,12 @@ func (pool *TxPool) RemoveTxs(txs types.Transactions) {
 	if err := pool.RemoveTxsFromPending(txs); err != nil {
 		pool.logger.Error("error while trying remove pending Txs", "err", err)
 	}
-	pool.mu.Lock()
-	for _, tx := range txs {
-		pool.all.Remove(tx.Hash())
-		pool.priced.Removed()
-	}
-	pool.mu.Unlock()
+	//pool.mu.Lock()
+	//for _, tx := range txs {
+	//	pool.all.Remove(tx.Hash())
+	//	pool.priced.Removed()
+	//}
+	//pool.mu.Unlock()
 }
 
 // removeTxInternal removes a single transaction from the queue, moving all subsequent

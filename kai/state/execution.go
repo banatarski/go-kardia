@@ -21,7 +21,6 @@ package state
 import (
 	"fmt"
 
-	fail "github.com/ebuchman/fail-test"
 	cmn "github.com/kardiachain/go-kardia/lib/common"
 	"github.com/kardiachain/go-kardia/lib/log"
 	"github.com/kardiachain/go-kardia/types"
@@ -49,7 +48,7 @@ func ApplyBlock(logger log.Logger, state LastestBlockState, blockID types.BlockI
 		return state, ErrInvalidBlock(err)
 	}
 
-	fail.Fail() // XXX
+	//fail.Fail() // XXX
 
 	// update the state with the block and responses
 	var err error
@@ -59,7 +58,7 @@ func ApplyBlock(logger log.Logger, state LastestBlockState, blockID types.BlockI
 	}
 
 	logger.Warn("Update evidence pool.")
-	fail.Fail() // XXX
+	//fail.Fail() // XXX
 
 	return state, nil
 }

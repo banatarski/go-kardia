@@ -330,7 +330,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 			}
 		}
 		if len(newTxs) > 0 {
-			pm.txpool.AddRemotes(txs)
+			pm.txpool.AddRemotes(newTxs)
 			//pm.logger.Trace("Transactions added to pool", "txs", newTxs)
 		}
 	case msg.Code == serviceconst.CsNewRoundStepMsg:
@@ -428,7 +428,7 @@ func (pm *ProtocolManager) BroadcastTxs(txs types.Transactions) {
 		peers := pm.peers.PeersWithoutTx(tx.Hash())
 		for _, peer := range peers {
 			if _, ok := txset[peer]; !ok {
-				peer.AsyncSendTransactions(txs)
+				go peer.AsyncSendTransactions(txs)
 				txset[peer] = make(types.Transactions, 0)
 			}
 			txset[peer] = append(txset[peer], tx)
