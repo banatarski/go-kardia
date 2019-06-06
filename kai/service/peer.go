@@ -339,7 +339,7 @@ func (p *peer) SendTransactions(txs types.Transactions) error {
 			}
 		}()
 		for _, tx := range txsToSend {
-			p.knownTxs.Add(tx.Hash())
+			p.MarkTransaction(tx.Hash())
 		}
 
 		if to == len(txs) {

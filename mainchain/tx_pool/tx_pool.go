@@ -801,7 +801,7 @@ func (pool *TxPool) add(tx *types.Transaction, local bool) (bool, error) {
 	// If the transaction fails basic validation, discard it
 	if err := pool.validateTx(tx/*, local*/); err != nil {
 		//pool.logger.Trace("Discarding invalid transaction", "hash", tx.Hash().Hex(), "err", err)
-		invalidTxCounter.Inc(1)
+		//invalidTxCounter.Inc(1)
 		return false, err
 	}
 

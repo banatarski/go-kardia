@@ -434,7 +434,7 @@ func (pm *ProtocolManager) BroadcastTxs(txs types.Transactions) {
 			txset[peer] = append(txset[peer], tx)
 
 			// add tx to peer
-			peer.knownTxs.Add(tx.Hash())
+			peer.MarkTransaction(tx.Hash())
 		}
 		//pm.logger.Trace("Broadcast transaction", "hash", tx.Hash(), "recipients", len(peers))
 	}
