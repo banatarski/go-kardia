@@ -326,18 +326,18 @@ func (ps *peerSet) PeersWithoutTx(hash common.Hash) []*peer {
 // SendTransactions sends transactions to the peer, adds the txn hashes to known txn set.
 func (p *peer) SendTransactions(txs types.Transactions) error {
 	from := 0
-	maxSize := 10000
+	maxSize := 1000
 	for {
 		to := from + maxSize
 		if to >= len(txs) {
 			to = len(txs)
 		}
 		txsToSend := txs[from:to]
-		//go func() {
-		if err := p2p.Send(p.rw, serviceconst.TxMsg, txsToSend); err != nil {
-			p.logger.Error("sending transaction failed", "err", err, "txs", txsToSend)
-		}
-		//}()
+		go func() {
+			if err := p2p.Send(p.rw, serviceconst.TxMsg, txsToSend); err != nil {
+				p.logger.Error("sending transaction failed", "err", err, "txs", txsToSend)
+			}
+		}()
 		for _, tx := range txsToSend {
 			p.knownTxs.Add(tx.Hash())
 		}
