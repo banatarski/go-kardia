@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"github.com/kardiachain/go-kardia/configs"
-	"github.com/kardiachain/go-kardia/kai/state"
 	"github.com/kardiachain/go-kardia/lib/common"
 	"github.com/kardiachain/go-kardia/lib/crypto"
 	"github.com/kardiachain/go-kardia/types"
@@ -32,10 +31,10 @@ type GeneratorTool struct {
 	mu sync.Mutex
 }
 
-func NewGeneratorTool(accounts []Account) *GeneratorTool {
+func NewGeneratorTool(accounts []Account, nonceMap map[string]uint64) *GeneratorTool {
 	return &GeneratorTool{
 		accounts: accounts,
-		nonceMap: make(map[string]uint64),
+		nonceMap: nonceMap,
 	}
 }
 
@@ -90,25 +89,30 @@ func (genTool *GeneratorTool) GetNonce(address string) uint64 {
 	return genTool.nonceMap[address]
 }
 
-func (genTool *GeneratorTool) GenerateRandomTxWithState(numTx int, stateDb *state.ManagedState) []*types.Transaction {
+func (genTool *GeneratorTool) GenerateRandomTxWithState(numTx, round uint64) []*types.Transaction {
 	genTool.mu.Lock()
-	if numTx <= 0 || len(genTool.accounts) == 0{
+	if numTx <= 0 || len(genTool.accounts) == 0 {
 		return nil
 	}
 	result := make([]*types.Transaction, numTx)
-	for i := 0; i < numTx; i++ {
+	for i := uint64(0); i < numTx; i++ {
 		senderKey, toAddr := randomTxAddresses(genTool.accounts)
 		senderPublicKey := crypto.PubkeyToAddress(senderKey.PublicKey)
-		nonce := stateDb.GetNonce(senderPublicKey)
+		//nonce := stateDb.GetNonce(senderPublicKey)
 		senderAddrS := senderPublicKey.String()
 
+		if _, ok := genTool.nonceMap[senderAddrS]; !ok {
+			genTool.nonceMap[senderAddrS] = 1
+		}
+
+		nonce := genTool.nonceMap[senderAddrS]
 		//log.Error("generate tx", "addr", senderAddrS, "nonce", nonce, "nonceMap", genTool.nonceMap[senderAddrS])
 
 		//get nonce from sender mapping
-		nonceMap := genTool.nonceMap[senderAddrS]
-		if nonce < nonceMap { // check nonce from statedb and nonceMap
-			nonce = nonceMap
-		}
+		//nonceMap := genTool.nonceMap[senderAddrS]
+		//if nonce < nonceMap { // check nonce from statedb and nonceMap
+		//	nonce = nonceMap
+		//}
 
 		tx, err := types.SignTx(types.NewTransaction(
 			nonce,
@@ -122,7 +126,7 @@ func (genTool *GeneratorTool) GenerateRandomTxWithState(numTx int, stateDb *stat
 			panic(fmt.Sprintf("Fail to sign generated tx: %v", err))
 		}
 		result[i] = tx
-		nonce +=1
+		nonce += 1
 		genTool.nonceMap[senderAddrS] = nonce
 	}
 	genTool.mu.Unlock()

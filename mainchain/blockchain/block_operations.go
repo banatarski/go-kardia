@@ -66,7 +66,7 @@ func (bo *BlockOperations) CreateProposalBlock(height int64, lastBlockID types.B
 	// Tx execution can happen in parallel with voting or precommitted.
 	// For simplicity, this code executes & commits txs before sending proposal,
 	// so statedb of proposal node already contains the new state and txs receipts of this proposal block.
-	txs := bo.collectTransactions(10000)
+	txs := bo.collectTransactions(0)
 	//bo.logger.Debug("Collected transactions", "txs", txs)
 
 	header := bo.newHeader(height, uint64(len(txs)), lastBlockID, lastValidatorHash)

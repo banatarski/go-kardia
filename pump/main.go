@@ -93,6 +93,7 @@ type Tps struct {
 
 var args flagArgs
 var accounts = make([]Account, 0)
+var genTool *GeneratorTool
 var blockchain *bc.BlockChain
 
 func init() {
@@ -426,9 +427,9 @@ func waitForever() {
 func genTxsLoop(txPool *tx_pool.TxPool) {
 	time.Sleep(60 * time.Second) //decrease it if you want to test it locally
 	genRound := 0
+	genTool = NewGeneratorTool(accounts, make(map[string]uint64))
 	for {
-		genTool := NewGeneratorTool(accounts)
-		genTxs(genTool, args.numTxs, txPool, genRound)
+		genTxs(genTool, uint64(args.numTxs), txPool, uint64(genRound))
 		genRound++
 		time.Sleep(time.Duration(args.txsDelay) * time.Second)
 	}
@@ -452,10 +453,10 @@ func addRemote(txPool *tx_pool.TxPool, tx *types.Transaction, genTool *Generator
 	}
 }
 
-func genTxs(genTool *GeneratorTool, numTxs int, txPool *tx_pool.TxPool, genRound int) {
+func genTxs(genTool *GeneratorTool, numTxs uint64, txPool *tx_pool.TxPool, genRound uint64) {
 	goodCount := 0
 	badCount := 0
-	txList := genTool.GenerateRandomTxWithState(numTxs, txPool.State())
+	txList := genTool.GenerateRandomTxWithState(numTxs, genRound)
 	//txList := genTool.GenerateTx(numTxs)
 	log.Info("GenTxs Adding new transactions", "num", numTxs, "genRound", genRound, "generatedTxList", len(txList))
 	//for _, tx := range txList {
@@ -464,7 +465,7 @@ func genTxs(genTool *GeneratorTool, numTxs int, txPool *tx_pool.TxPool, genRound
 	errs := txPool.AddRemotes(txList)
 	for _, err := range errs {
 		if err != nil {
-			log.Error("Fail to add transaction list", "err", err)
+			log.Error("Fail to add transaction list","err", err)
 			badCount++
 		} else {
 			goodCount++
@@ -506,11 +507,11 @@ func pump(w http.ResponseWriter, r *http.Request) {
 
 	idx, genesisIdx := m["index"]
 	if genesisIdx {
-		if idx == 1 {
+		if idx == "1" {
 			accounts = GetAccounts(GenesisAddrKeys1)
-		} else if idx == 2 {
+		} else if idx == "2" {
 			accounts = GetAccounts(GenesisAddrKeys2)
-		} else if idx == 3 {
+		} else if idx == "3" {
 			accounts = GetAccounts(GenesisAddrKeys3)
 		} else {
 			respondWithError(w, 500, "invalid genesis index")
@@ -543,6 +544,7 @@ func pump(w http.ResponseWriter, r *http.Request) {
 
 	args.numTxs = int(numTxs)
 	args.txsDelay = int(delay)
+	genTool = NewGeneratorTool(accounts, genTool.nonceMap)
 
 	respondWithJSON(w, 200, "OK")
 }
@@ -562,16 +564,14 @@ func tps(w http.ResponseWriter, r *http.Request) {
 	result := make([]Tps, 0)
 
 	currentHeight := blockchain.CurrentBlock().Height()
-	log.Error("tps", "currentHeight", currentHeight)
 	count := uint64(0)
 	blockTime := int64(0)
 	numTxs := uint64(0)
 
 	for {
-		if count == 70 || currentHeight == 0 {
+		if count > 301 || currentHeight == 1 {
 			break
 		}
-
 		// get block by height
 		block := blockchain.GetBlockByHeight(currentHeight)
 		previousBlock := blockchain.GetBlockByHeight(currentHeight - 1)
@@ -597,7 +597,6 @@ func tps(w http.ResponseWriter, r *http.Request) {
 		count++
 		currentHeight--
 	}
-	log.Error("tps", "result", result)
 	respondWithJSON(w, 200, result)
 }
 

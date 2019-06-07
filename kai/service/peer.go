@@ -300,12 +300,29 @@ func (p *peer) broadcast() {
 
 // MarkTransaction marks a transaction as known for the peer, ensuring that it
 // will never be propagated to this particular peer.
-func (p *peer) MarkTransaction(hash common.Hash) {
-	// If we reached the memory allowance, drop a previously known transaction hash
-	for p.knownTxs.Size() >= maxKnownTxs {
-		p.knownTxs.Pop()
+func (p *peer) MarkTransaction(txs types.Transactions) []*types.Transaction {
+	newTxs := make([]*types.Transaction, 0)
+	hashes := make([]interface{}, 0)
+
+	for _, tx := range txs {
+
+		if tx == nil {
+			continue
+		}
+
+		if p.knownTxs.Has(tx.Hash()) {
+			hashes = append(hashes, tx.Hash())
+			newTxs = append(newTxs, tx)
+		}
 	}
-	p.knownTxs.Add(hash)
+	if len(hashes) > 0 {
+		for p.knownTxs.Size() >= maxKnownTxs + len(hashes) {
+			p.knownTxs.Pop()
+		}
+		p.knownTxs.Add(hashes...)
+	}
+
+	return newTxs
 }
 
 // PeersWithoutTx retrieves a list of peers that do not have a given transaction
@@ -325,31 +342,31 @@ func (ps *peerSet) PeersWithoutTx(hash common.Hash) []*peer {
 
 // SendTransactions sends transactions to the peer, adds the txn hashes to known txn set.
 func (p *peer) SendTransactions(txs types.Transactions) error {
-	from := 0
-	maxSize := 1000
-	for {
-		to := from + maxSize
-		if to >= len(txs) {
-			to = len(txs)
-		}
-		txsToSend := txs[from:to]
-		go func() {
-			if err := p2p.Send(p.rw, serviceconst.TxMsg, txsToSend); err != nil {
-				p.logger.Error("sending transaction failed", "err", err, "txs", txsToSend)
-			}
-		}()
-		for _, tx := range txsToSend {
-			p.MarkTransaction(tx.Hash())
-		}
-
-		if to == len(txs) {
-			break
-		}
-		from = to
-		//p.SendTransaction(tx)
-	}
-	return nil
-	//return p2p.Send(p.rw, serviceconst.TxMsg, txs)
+	//from := 0
+	//maxSize := 2000
+	//for {
+	//	to := from + maxSize
+	//	if to >= len(txs) {
+	//		to = len(txs)
+	//	}
+	//	txsToSend := txs[from:to]
+	//	go func() {
+	//		if err := p2p.Send(p.rw, serviceconst.TxMsg, txsToSend); err != nil {
+	//			p.logger.Error("sending transaction failed", "err", err)
+	//		}
+	//	}()
+	//	//for _, tx := range txsToSend {
+	//	//	p.knownTxs.Add(tx.Hash())
+	//	//}
+	//
+	//	if to == len(txs) {
+	//		break
+	//	}
+	//	from = to
+	//	//p.SendTransaction(tx)
+	//}
+	//return nil
+	return p2p.Send(p.rw, serviceconst.TxMsg, txs)
 }
 
 func (p *peer) SendTransaction(tx *types.Transaction) {

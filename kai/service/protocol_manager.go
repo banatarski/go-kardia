@@ -318,17 +318,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		if err := msg.Decode(&txs); err != nil {
 			return errResp(ErrDecode, "msg %v: %v", msg, err)
 		}
-		newTxs := make([]*types.Transaction, 0)
-		for i, tx := range txs {
-			// Validate and mark the remote transaction
-			if tx == nil {
-				return errResp(ErrDecode, "transaction %d is nil", i)
-			}
-			if !p.knownTxs.Has(tx.Hash()) {
-				p.MarkTransaction(tx.Hash())
-				newTxs = append(newTxs, tx)
-			}
-		}
+		newTxs := p.MarkTransaction(txs)
 		if len(newTxs) > 0 {
 			pm.txpool.AddRemotes(newTxs)
 			//pm.logger.Trace("Transactions added to pool", "txs", newTxs)
@@ -375,7 +365,7 @@ func (pm *ProtocolManager) syncTransactions(p *peer) {
 	pm.logger.Trace("Sync txns to new peer", "peer", p)
 	// TODO(thientn): sends transactions in chunks. This may send a large number of transactions.
 	// Breaks them to chunks here or inside AsyncSend to not overload the pipeline.
-	txs, _, _ := pm.txpool.Pending(0)
+	txs, _ := pm.txpool.Pending(0)
 	if len(txs) == 0 {
 		return
 	}
@@ -413,7 +403,9 @@ func (pm *ProtocolManager) Broadcast(msg interface{}, msgType uint64) {
 		pm.wg.Add(1)
 		go func(p *peer) {
 			defer pm.wg.Done()
-			p2p.Send(p.rw, msgType, msg)
+			if err := p2p.Send(p.rw, msgType, msg); err !=nil {
+				pm.logger.Error("error while broadcasting consensus message", "err", err, "msg", msg, "msgType")
+			}
 		}(p)
 	}
 }
@@ -421,7 +413,7 @@ func (pm *ProtocolManager) Broadcast(msg interface{}, msgType uint64) {
 // BroadcastTxs will propagate a batch of transactions to all peers which are not known to
 // already have the given transaction.
 func (pm *ProtocolManager) BroadcastTxs(txs types.Transactions) {
-	var txset = make(map[*peer]types.Transactions)
+	var txset = make(map[*peer][]interface{})
 	pm.logger.Info("Start broadcast txs", "number of txs", len(txs))
 	// Broadcast transactions to a batch of peers not knowing about it
 	for _, tx := range txs {
@@ -429,19 +421,16 @@ func (pm *ProtocolManager) BroadcastTxs(txs types.Transactions) {
 		for _, peer := range peers {
 			if _, ok := txset[peer]; !ok {
 				go peer.AsyncSendTransactions(txs)
-				txset[peer] = make(types.Transactions, 0)
+				txset[peer] = make([]interface{}, 0)
 			}
-			txset[peer] = append(txset[peer], tx)
-
-			// add tx to peer
-			peer.MarkTransaction(tx.Hash())
+			txset[peer] = append(txset[peer], tx.Hash())
 		}
-		//pm.logger.Trace("Broadcast transaction", "hash", tx.Hash(), "recipients", len(peers))
 	}
-	// FIXME include this again: peers = peers[:int(math.Sqrt(float64(len(peers))))]
-	//for peer, txs := range txset {
-	//	peer.AsyncSendTransactions(txs)
-	//}
+	for peer, txs := range txset {
+		if len(txs) > 0 {
+			peer.knownTxs.Add(txs...)
+		}
+	}
 }
 
 // NodeInfo represents a short summary of the Kardia sub-protocol metadata

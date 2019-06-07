@@ -311,7 +311,7 @@ func (s *PublicKaiAPI) KardiaCall(ctx context.Context, call types.CallArgsJSON, 
 
 // PendingTransactions returns pending transactions
 func (a *PublicTransactionAPI) PendingTransactions() ([]*PublicTransaction, error) {
-	pending, _, err := a.s.TxPool().Pending(0)
+	pending, err := a.s.TxPool().Pending(0)
 	if err != nil {
 		return nil, err
 	}
