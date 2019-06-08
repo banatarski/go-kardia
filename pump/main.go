@@ -281,7 +281,7 @@ func main() {
 		PriceLimit:   1,
 		PriceBump:    10,
 		AccountSlots: 16,
-		GlobalSlots:  8000,
+		GlobalSlots:  5000,
 		AccountQueue: 64,
 		GlobalQueue:  1024,
 		Lifetime: 3 * time.Hour,
@@ -563,13 +563,17 @@ func status(w http.ResponseWriter, r *http.Request) {
 func tps(w http.ResponseWriter, r *http.Request) {
 	result := make([]Tps, 0)
 
+	blocks, err := strconv.ParseInt(r.FormValue("blocks"), 10, 64)
+	if err != nil {
+		blocks = 5
+	}
+
 	currentHeight := blockchain.CurrentBlock().Height()
-	count := uint64(0)
 	blockTime := int64(0)
 	numTxs := uint64(0)
 
 	for {
-		if count > 301 || currentHeight == 1 {
+		if blocks == 0 || currentHeight == 1 {
 			break
 		}
 		// get block by height
@@ -583,20 +587,17 @@ func tps(w http.ResponseWriter, r *http.Request) {
 		blockTime += currentBlockTime - previousBlockTime
 		numTxs += block.NumTxs()
 
-		log.Error("tps", "blockTime", blockTime, "height", currentHeight, "currentBlockTime", block.Time().Int64())
-
-		if count == 5 || count == 10 || count == 20 || count == 30 || count == 50 || count == 100 || count == 200 || count == 300 {
-			result = append(result, Tps{
-				Blocks: count,
-				BlockTime: blockTime,
-				Txs: numTxs,
-				Tps: float64(int64(numTxs)/blockTime),
-			})
-		}
-
-		count++
+		blocks--
 		currentHeight--
 	}
+
+	result = append(result, Tps{
+		Blocks: uint64(blocks),
+		BlockTime: blockTime,
+		Txs: numTxs,
+		Tps: float64(int64(numTxs)/blockTime),
+	})
+
 	respondWithJSON(w, 200, result)
 }
 

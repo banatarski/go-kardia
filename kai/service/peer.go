@@ -300,7 +300,7 @@ func (p *peer) broadcast() {
 
 // MarkTransaction marks a transaction as known for the peer, ensuring that it
 // will never be propagated to this particular peer.
-func (p *peer) MarkTransaction(txs types.Transactions) []*types.Transaction {
+func (p *peer) MarkTransaction(txs types.Transactions, validate bool) []*types.Transaction {
 	newTxs := make([]*types.Transaction, 0)
 	hashes := make([]interface{}, 0)
 
@@ -310,15 +310,20 @@ func (p *peer) MarkTransaction(txs types.Transactions) []*types.Transaction {
 			continue
 		}
 
-		if p.knownTxs.Has(tx.Hash()) {
+		if validate {
+			if p.knownTxs.Has(tx.Hash()) {
+				hashes = append(hashes, tx.Hash())
+				newTxs = append(newTxs, tx)
+			}
+		} else {
 			hashes = append(hashes, tx.Hash())
 			newTxs = append(newTxs, tx)
 		}
 	}
 	if len(hashes) > 0 {
-		for p.knownTxs.Size() >= maxKnownTxs + len(hashes) {
-			p.knownTxs.Pop()
-		}
+		//for p.knownTxs.Size() >= maxKnownTxs + len(hashes) {
+		//	p.knownTxs.Pop()
+		//}
 		p.knownTxs.Add(hashes...)
 	}
 

@@ -318,9 +318,9 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		if err := msg.Decode(&txs); err != nil {
 			return errResp(ErrDecode, "msg %v: %v", msg, err)
 		}
-		newTxs := p.MarkTransaction(txs)
+		newTxs := p.MarkTransaction(txs, true)
 		if len(newTxs) > 0 {
-			pm.txpool.AddRemotes(newTxs)
+			pm.txpool.AddLocals(txs)
 			//pm.logger.Trace("Transactions added to pool", "txs", newTxs)
 		}
 	case msg.Code == serviceconst.CsNewRoundStepMsg:
@@ -413,23 +413,24 @@ func (pm *ProtocolManager) Broadcast(msg interface{}, msgType uint64) {
 // BroadcastTxs will propagate a batch of transactions to all peers which are not known to
 // already have the given transaction.
 func (pm *ProtocolManager) BroadcastTxs(txs types.Transactions) {
-	var txset = make(map[*peer][]interface{})
+	var txset = make(map[*peer]types.Transactions)
 	pm.logger.Info("Start broadcast txs", "number of txs", len(txs))
 	// Broadcast transactions to a batch of peers not knowing about it
 	for _, tx := range txs {
 		peers := pm.peers.PeersWithoutTx(tx.Hash())
 		for _, peer := range peers {
 			if _, ok := txset[peer]; !ok {
-				go peer.AsyncSendTransactions(txs)
-				txset[peer] = make([]interface{}, 0)
+				txset[peer] = make(types.Transactions, 0)
 			}
-			txset[peer] = append(txset[peer], tx.Hash())
+			txset[peer] = append(txset[peer], tx)
 		}
 	}
 	for peer, txs := range txset {
-		if len(txs) > 0 {
-			peer.knownTxs.Add(txs...)
-		}
+		go peer.AsyncSendTransactions(txs)
+		//if len(txs) > 0 {
+		peer.MarkTransaction(txs, false)
+		//
+		//}
 	}
 }
 

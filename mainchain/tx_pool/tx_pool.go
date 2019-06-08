@@ -315,9 +315,10 @@ func (pool *TxPool) lockedReset(oldHead, newHead *types.Header) {
 // of the transaction pool is valid with regard to the chain state.
 func (pool *TxPool) reset(oldHead, newHead *types.Header) {
 	// Initialize the internal state to the current head
-	pool.mu.Lock()
+	currentBlock := pool.chain.CurrentBlock()
+
 	if newHead == nil {
-		newHead = pool.chain.CurrentBlock().Header() // Special case during testing
+		newHead = currentBlock.Header() // Special case during testing
 	}
 
 	statedb, err := pool.chain.StateAt(newHead.Root)
@@ -326,16 +327,15 @@ func (pool *TxPool) reset(oldHead, newHead *types.Header) {
 		pool.logger.Error("Failed to reset txpool state", "err", err)
 		return
 	}
-
+	pool.mu.Lock()
 	pool.currentState = statedb
 	pool.pendingState = state.ManageState(statedb)
-
 	pool.currentMaxGas = newHead.GasLimit
-
 	pool.mu.Unlock()
-	// get pending list in order to sort and update pending state
-	if _, err := pool.Pending(0); err != nil {
-		pool.logger.Error("reset - error while getting pending list", "err", err)
+
+	// remove current block's txs from pending
+	if err := pool.RemoveTxsFromPending(currentBlock.Transactions()); err != nil {
+		pool.logger.Error("reset - error while removing txs", "err", err)
 	}
 }
 
@@ -534,7 +534,26 @@ func (pool *TxPool) AddLocal(tx *types.Transaction) error {
 	if err := pool.addTx(tx, !pool.config.NoLocals); err != nil {
 		return err
 	}
-	//go pool.txFeed.Send(events.NewTxsEvent{Txs: []*types.Transaction{tx}})
+	sender, err := types.Sender(tx)
+	if err != nil {
+		return ErrInvalidSender
+	}
+
+	pool.all.Add(tx.Hash())
+
+	pool.mu.RLock()
+	_, ok := pool.pending[sender]
+	pool.mu.RUnlock()
+
+	if !ok {
+		pool.mu.Lock()
+		pool.pending[sender] = set.New(tx)
+		pool.mu.Unlock()
+	} else {
+		pool.pending[sender].Add(tx)
+	}
+
+	go pool.txFeed.Send(events.NewTxsEvent{Txs: []*types.Transaction{tx}})
 	return nil
 }
 
@@ -545,7 +564,27 @@ func (pool *TxPool) AddRemote(tx *types.Transaction) error {
 	if err := pool.addTx(tx, false); err != nil {
 		return err
 	}
-	//go pool.txFeed.Send(events.NewTxsEvent{Txs: []*types.Transaction{tx}})
+
+	sender, err := types.Sender(tx)
+	if err != nil {
+		return ErrInvalidSender
+	}
+
+	pool.all.Add(tx.Hash())
+
+	pool.mu.RLock()
+	_, ok := pool.pending[sender]
+	pool.mu.RUnlock()
+
+	if !ok {
+		pool.mu.Lock()
+		pool.pending[sender] = set.New(tx)
+		pool.mu.Unlock()
+	} else {
+		pool.pending[sender].Add(tx)
+	}
+
+	go pool.txFeed.Send(events.NewTxsEvent{Txs: []*types.Transaction{tx}})
 	return nil
 }
 
@@ -612,8 +651,15 @@ func (pool *TxPool) addTxs(txs []*types.Transaction, local bool) []error {
 		}
 		pool.all.Add(hashes...)
 		for addr, txs := range pendings {
-			if _, ok := pool.pending[addr]; !ok {
+
+			pool.mu.RLock()
+			_, ok := pool.pending[addr]
+			pool.mu.RUnlock()
+
+			if !ok {
+				pool.mu.Lock()
 				pool.pending[addr] = set.New(txs...)
+				pool.mu.Unlock()
 			} else {
 				pool.pending[addr].Add(txs...)
 			}
