@@ -303,6 +303,8 @@ func (p *peer) broadcast() {
 func (p *peer) MarkTransaction(txs types.Transactions, validate bool) []*types.Transaction {
 	newTxs := make([]*types.Transaction, 0)
 	hashes := make([]interface{}, 0)
+	removedHashes := make([]interface{}, 0)
+	size := p.knownTxs.Size()
 
 	for _, tx := range txs {
 
@@ -320,12 +322,20 @@ func (p *peer) MarkTransaction(txs types.Transactions, validate bool) []*types.T
 			newTxs = append(newTxs, tx)
 		}
 	}
-	if len(hashes) > 0 {
-		//for p.knownTxs.Size() >= maxKnownTxs + len(hashes) {
-		//	p.knownTxs.Pop()
-		//}
-		p.knownTxs.Add(hashes...)
-	}
+
+	p.knownTxs.Each(func(item interface{}) bool {
+		if size - len(removedHashes) < maxKnownTxs + len(hashes) {
+			return false
+		}
+
+		removedHashes = append(removedHashes, item)
+		return true
+	})
+	//for p.knownTxs.Size() >= maxKnownTxs + len(hashes) {
+	//	p.knownTxs.Pop()
+	//}
+	p.knownTxs.Add(hashes...)
+	p.knownTxs.Remove(removedHashes...)
 
 	return newTxs
 }

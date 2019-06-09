@@ -436,6 +436,7 @@ func (pool *TxPool) RemoveTxsFromPending(txs types.Transactions) error {
 func (pool *TxPool) Pending(limit int) (types.Transactions, error) {
 	pending := make(types.Transactions, 0)
 	// indexes is found txs indexes in pool.pending
+	count := 0
 	for addr, pendingTxs := range pool.pending {
 		if pendingTxs.IsEmpty() {
 			continue
@@ -446,21 +447,39 @@ func (pool *TxPool) Pending(limit int) (types.Transactions, error) {
 
 		// txs is a list of valid txs, txs will be sorted after loop
 		txs := make(types.Transactions, 0)
-		copiedTxs := pendingTxs.Copy()
+		//copiedTxs := pendingTxs.Copy()
 
-		for {
-			if copiedTxs.IsEmpty() || (limit > 0 && len(pending) + len(txs) >= limit) {
-				break
+		pendingTxs.Each(func(item interface{}) bool {
+
+			if limit > 0 && count == limit {
+				return false
 			}
-			tx := copiedTxs.Pop().(*types.Transaction)
+
+			tx := item.(*types.Transaction)
 			if err := pool.pendingValidation(tx); err != nil {
 				// remove tx from all and priced
 				removedHashes = append(removedHashes, tx.Hash())
 				removedPendings = append(removedPendings, tx)
-				continue
+			} else {
+				txs = append(txs, tx)
 			}
-			txs = append(txs, tx)
-		}
+
+			return true
+		})
+
+		//for {
+		//	if copiedTxs.IsEmpty() || (limit > 0 && len(pending) + len(txs) >= limit) {
+		//		break
+		//	}
+		//	tx := copiedTxs.Pop().(*types.Transaction)
+		//	if err := pool.pendingValidation(tx); err != nil {
+		//		// remove tx from all and priced
+		//		removedHashes = append(removedHashes, tx.Hash())
+		//		removedPendings = append(removedPendings, tx)
+		//		continue
+		//	}
+		//	txs = append(txs, tx)
+		//}
 		if len(txs) > 0 {
 			sort.Sort(types.TxByNonce(txs))
 			pending = append(pending, txs...)
