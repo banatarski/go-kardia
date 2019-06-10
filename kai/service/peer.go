@@ -308,22 +308,16 @@ func (p *peer) MarkTransaction(txs types.Transactions, validate bool) []*types.T
 
 	for _, tx := range txs {
 
-		if tx == nil {
+		if tx == nil || (validate && p.knownTxs.Has(tx.Hash())) {
 			continue
 		}
 
-		if validate {
-			if p.knownTxs.Has(tx.Hash()) {
-				hashes = append(hashes, tx.Hash())
-				newTxs = append(newTxs, tx)
-			}
-		} else {
-			hashes = append(hashes, tx.Hash())
-			newTxs = append(newTxs, tx)
-		}
+		hashes = append(hashes, tx.Hash())
+		newTxs = append(newTxs, tx)
 	}
 
 	p.knownTxs.Each(func(item interface{}) bool {
+
 		if size - len(removedHashes) < maxKnownTxs + len(hashes) {
 			return false
 		}
