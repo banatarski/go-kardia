@@ -271,7 +271,7 @@ func (pm *ProtocolManager) handle(p *peer) error {
 	defer pm.removePeer(p.id)
 
 	// TODO(thientn): performance optimization. This function should be reliable since it's before the main loop.
-	pm.syncTransactions(p)
+	//pm.syncTransactions(p)
 
 	// main loop. handle incoming messages.
 	for {
@@ -320,7 +320,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		}
 		newTxs := p.MarkTransaction(txs, true)
 		if len(newTxs) > 0 {
-			pm.txpool.AddLocals(txs)
+			pm.txpool.AddTxs(newTxs)
 			//pm.logger.Trace("Transactions added to pool", "txs", newTxs)
 		}
 	case msg.Code == serviceconst.CsNewRoundStepMsg:

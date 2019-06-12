@@ -21,6 +21,7 @@ package blockchain
 import (
 	"errors"
 	"fmt"
+	"github.com/kardiachain/go-kardia/mainchain/tx_pool"
 	"math"
 	"math/big"
 
@@ -30,9 +31,8 @@ import (
 	"github.com/kardiachain/go-kardia/lib/common"
 	"github.com/kardiachain/go-kardia/lib/crypto"
 	"github.com/kardiachain/go-kardia/lib/log"
-	"github.com/kardiachain/go-kardia/types"
 	vm "github.com/kardiachain/go-kardia/mainchain/kvm"
-	"github.com/kardiachain/go-kardia/mainchain/tx_pool"
+	"github.com/kardiachain/go-kardia/types"
 )
 
 var (
@@ -272,6 +272,7 @@ func (st *StateTransition) preCheck() error {
 		//	return ErrNonceTooHigh
 		//} else
 		if nonce > st.msg.Nonce() {
+			log.Error("nonce too low", "nonce", nonce)
 			return tx_pool.ErrNonceTooLow
 		}
 	}
@@ -310,7 +311,7 @@ func (st *StateTransition) TransitionDb() (ret []byte, usedGas uint64, failed bo
 	} else {
 		// Increment the nonce for the next transaction
 		//st.state.SetNonce(msg.From(), st.state.GetNonce(sender.Address())+1)
-		st.state.SetNonce(msg.From(), msg.Nonce() + 1)
+		st.state.SetNonce(msg.From(), msg.Nonce())
 		ret, st.gas, vmerr = vm.Call(sender, st.to(), st.data, st.gas, st.value)
 	}
 	if vmerr != nil {

@@ -22,7 +22,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"github.com/kardiachain/go-kardia/types"
 	"github.com/rs/cors"
 	"io/ioutil"
 	"net/http"
@@ -81,7 +80,8 @@ type flagArgs struct {
 type Response struct {
 	NumTxs   int             `json:"numTxs"`
 	Delay    int             `json:"delay"`
-	Accounts []Account   `json:"accounts"`
+	Accounts []Account       `json:"accounts"`
+	Pending  int64           `json:"pending"`
 }
 
 type Tps struct {
@@ -95,6 +95,7 @@ var args flagArgs
 var accounts = make([]Account, 0)
 var genTool *GeneratorTool
 var blockchain *bc.BlockChain
+var kardiaService *kai.KardiaService
 
 func init() {
 	flag.StringVar(&args.logLevel, "loglevel", "info", "minimum log verbosity to display")
@@ -281,10 +282,13 @@ func main() {
 		PriceLimit:   1,
 		PriceBump:    10,
 		AccountSlots: 16,
-		GlobalSlots:  5000,
+		GlobalSlots:  100000, // for pending
 		AccountQueue: 64,
-		GlobalQueue:  1024,
+		GlobalQueue:  150000, // for all
 		Lifetime: 3 * time.Hour,
+		NumberOfWorkers: 5,
+		WorkerCap: 600,
+		BlockSize: 9000,
 	}
 	config.MainChainConfig.IsZeroFee = args.isZeroFee
 	config.MainChainConfig.IsPrivate = args.isPrivate
@@ -319,7 +323,6 @@ func main() {
 		return
 	}
 
-	var kardiaService *kai.KardiaService
 	if err := n.Service(&kardiaService); err != nil {
 		logger.Error("Cannot get Kardia Service", "err", err)
 		return
@@ -425,7 +428,7 @@ func waitForever() {
 // genTxsLoop generate & add a batch of transfer txs, repeat after delay flag.
 // Warning: Set txsDelay < 5 secs may build up old subroutines because previous subroutine to add txs won't be finished before new one starts.
 func genTxsLoop(txPool *tx_pool.TxPool) {
-	time.Sleep(60 * time.Second) //decrease it if you want to test it locally
+	time.Sleep(20 * time.Second) //decrease it if you want to test it locally
 	genRound := 0
 	genTool = NewGeneratorTool(accounts, make(map[string]uint64))
 	for {
@@ -435,43 +438,26 @@ func genTxsLoop(txPool *tx_pool.TxPool) {
 	}
 }
 
-func addRemote(txPool *tx_pool.TxPool, tx *types.Transaction, genTool *GeneratorTool) {
-	//if err := txPool.AddRemotes([]*types.Transaction{tx}); err != nil {
-	//	sender, err1 := types.Sender(tx)
-	//	if err1 != nil {
-	//		log.Error("addRemote - invalid sender", "err", err1)
-	//	} else {
-	//		log.Error("Add remote failed", "err", err, "tx", tx.Hash().Hex(),
-	//			"txNonce", tx.Nonce(), "sender", sender.Hex(), "senderNonce", genTool.GetNonce(sender.Hex()))
-	//	}
-	//}
-	errs := txPool.AddRemotes([]*types.Transaction{tx})
-	for _, err := range errs {
-		if err != nil {
-			log.Error("Add remote failed", "err", err, "tx", tx.Hash().Hex())
-		}
-	}
-}
-
 func genTxs(genTool *GeneratorTool, numTxs uint64, txPool *tx_pool.TxPool, genRound uint64) {
-	goodCount := 0
-	badCount := 0
+	//goodCount := 0
+	//badCount := 0
 	txList := genTool.GenerateRandomTxWithState(numTxs, genRound)
 	//txList := genTool.GenerateTx(numTxs)
-	log.Info("GenTxs Adding new transactions", "num", numTxs, "genRound", genRound, "generatedTxList", len(txList))
+	log.Info("GenTxs Adding new transactions", "num", numTxs, "genRound", genRound, "generatedTxList", len(txList), "pendingPool", txPool.PendingSize())
+	txPool.AddTxs(txList)
 	//for _, tx := range txList {
-	//	addRemote(txPool, tx, genTool)
+	//	txPool.AddTxs(tx)
 	//}
-	errs := txPool.AddRemotes(txList)
-	for _, err := range errs {
-		if err != nil {
-			log.Error("Fail to add transaction list","err", err)
-			badCount++
-		} else {
-			goodCount++
-		}
-	}
-	log.Info("GenTxs Finish adding generated txs", "success", goodCount, "failure", badCount, "genRound", genRound)
+	//errs := txPool.AddRemotes(txList)
+	//for _, err := range errs {
+	//	if err != nil {
+	//		log.Error("Fail to add transaction list","err", err)
+	//		badCount++
+	//	} else {
+	//		goodCount++
+	//	}
+	//}
+	//log.Info("GenTxs Finish adding generated txs", "success", goodCount, "failure", badCount, "genRound", genRound)
 }
 
 func pump(w http.ResponseWriter, r *http.Request) {
@@ -555,6 +541,7 @@ func status(w http.ResponseWriter, r *http.Request) {
 		NumTxs: args.numTxs,
 		Delay: args.txsDelay,
 		Accounts: accounts,
+		Pending: kardiaService.TxPool().PendingSize(),
 	}
 
 	respondWithJSON(w, 200, response)

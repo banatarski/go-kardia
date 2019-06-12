@@ -574,11 +574,16 @@ OUTER_LOOP:
 		if rs.Proposal != nil && !prs.Proposal {
 			// Proposal: share the proposal metadata with peer.
 			{
-				logger.Debug("Sending proposal", "height", prs.Height, "round", prs.Round)
-				if err := p2p.Send(ps.rw, service.CsProposalMsg, &ProposalMessage{Proposal: rs.Proposal}); err != nil {
-					logger.Trace("Sending proposal failed", "err", err)
-				}
 				ps.SetHasProposal(rs.Proposal)
+				var wg sync.WaitGroup
+				go func() {
+					wg.Add(1)
+					logger.Debug("Sending proposal", "height", prs.Height, "round", prs.Round)
+					if err := p2p.Send(ps.rw, service.CsProposalMsg, &ProposalMessage{Proposal: rs.Proposal}); err != nil {
+						logger.Trace("Sending proposal failed", "err", err)
+					}
+					wg.Done()
+				} ()
 			}
 			// ProposalPOL: lets peer know which POL votes we have so far.
 			// Peer must receive ProposalMessage first.
