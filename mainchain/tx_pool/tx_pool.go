@@ -80,10 +80,6 @@ var (
 	ErrOversizedData = errors.New("oversized data")
 )
 
-var (
-	evictionInterval    = time.Minute     // Time interval to check for evictable transactions
-)
-
 // TxStatus is the current status of a transaction as seen by the pool.
 type TxStatus uint
 
@@ -188,6 +184,9 @@ type TxPool struct {
 	chainHeadSub event.Subscription
 	mu           sync.RWMutex
 
+	numberOfWorkers int
+	workerCap       int
+
 	currentState *state.StateDB      // Current state in the blockchain head
 	pendingState *state.ManagedState // Pending state tracking virtual nonces
 
@@ -201,7 +200,6 @@ type TxPool struct {
 	//queue   map[common.Address]*txList   // Queued but non-processable transactions
 	beats   map[common.Address]time.Time   // Last heartbeat from each known account
 	all     *common.Set                        // All transactions to allow lookups
-	//priced  *txPricedList                // All transactions sorted by price
 
 	wg sync.WaitGroup // for shutdown sync
 }
@@ -227,6 +225,8 @@ func NewTxPool(logger log.Logger, config TxPoolConfig, chainconfig *configs.Chai
 		totalPendingGas: uint64(0),
 		txsCh: make(chan []*types.Transaction, 100),
 		pendingCh: make(chan map[common.Address][]interface{}),
+		numberOfWorkers: config.NumberOfWorkers,
+		workerCap: config.WorkerCap,
 	}
 	pool.locals = newAccountSet()
 	//pool.priced = newTxPricedList(logger, pool.all)
@@ -256,12 +256,6 @@ func NewTxPool(logger log.Logger, config TxPoolConfig, chainconfig *configs.Chai
 func (pool *TxPool) loop() {
 	defer pool.wg.Done()
 
-	evict := time.NewTicker(evictionInterval)
-	defer evict.Stop()
-
-	journal := time.NewTicker(pool.config.Rejournal)
-	defer journal.Stop()
-
 	// Track the previous head headers for transaction reorgs
 	head := pool.chain.CurrentBlock()
 
@@ -271,9 +265,13 @@ func (pool *TxPool) loop() {
 		select {
 		// Handle ChainHeadEvent
 		case ev := <-pool.chainHeadCh:
-			if ev.Block != nil {
-				pool.reset(head.Header(), ev.Block.Header())
-			}
+			pool.wg.Add(1)
+			go func() {
+				if ev.Block != nil {
+					pool.reset(head.Header(), ev.Block.Header())
+				}
+				pool.wg.Done()
+			}()
 		// Be unsubscribed due to system stopped
 		case <-pool.chainHeadSub.Err():
 			return
@@ -287,7 +285,7 @@ func (pool *TxPool) loop() {
 
 func (pool *TxPool) collectTxs() {
 	var wg sync.WaitGroup
-	for i := 0; i < pool.config.NumberOfWorkers; i++ {
+	for i := 0; i < pool.numberOfWorkers; i++ {
 		wg.Add(1)
 		go pool.work(i, pool.txsCh, &wg)
 	}
@@ -298,24 +296,34 @@ func (pool *TxPool) work(id int, jobs <-chan []*types.Transaction, wg *sync.Wait
 		if errs := pool.AddRemotes(job); errs != nil && len(errs) > 0 {
 			for _,err := range errs {
 				if err != nil {
-					pool.logger.Error("error while addtx to pool", "err", err, "worker", id)
+					pool.logger.Error("error while add tx to pool", "err", err, "worker", id)
 				}
 			}
-
 		}
 	}
 	wg.Done()
 }
 
-func (pool *TxPool) AddTxs(txs []*types.Transaction) {
+func (pool *TxPool) AddTxs(txs []*types.Transaction) error {
+
+	if pool.PendingSize() >= int64(pool.config.GlobalSlots) {
+		return fmt.Errorf("pool has reached its limit")
+	}
+
 	if len(txs) > 0 {
-		to := pool.config.WorkerCap
+		to := pool.workerCap
 		if len(txs) < to {
 			to = len(txs)
 		}
 		pool.txsCh <- txs[0:to]
 		go pool.AddTxs(txs[to:])
 	}
+	return nil
+}
+
+func (pool *TxPool) ResetWorker(workers int, cap int) {
+	pool.numberOfWorkers = workers
+	pool.workerCap = cap
 }
 
 // lockedReset is a wrapper around reset to allow calling it in a thread safe
@@ -710,7 +718,6 @@ func (pool *TxPool) handlePendingTxs(txs map[common.Address][]interface{}) {
 		pool.pending[addr].Add(txs...)
 	}
 }
-
 
 // RemoveTx removes transactions from pending queue.
 // This function is mainly for caller in blockchain/consensus to directly remove committed txs.

@@ -54,11 +54,12 @@ func (s *Set) Add(items ...interface{}) {
 // Remove deletes the specified items from the set.  The underlying Set s is
 // modified. If passed nothing it silently returns.
 func (s *Set) Remove(items ...interface{}) {
-	if len(items) == 0 {
-		return
-	}
 	s.l.Lock()
 	defer s.l.Unlock()
+
+	if len(items) == 0 || len(s.m) == 0 {
+		return
+	}
 	for _, item := range items {
 		delete(s.m, item)
 	}

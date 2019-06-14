@@ -286,7 +286,7 @@ func main() {
 		AccountQueue: 64,
 		GlobalQueue:  150000, // for all
 		Lifetime: 3 * time.Hour,
-		NumberOfWorkers: 5,
+		NumberOfWorkers: 15,
 		WorkerCap: 600,
 		BlockSize: 9000,
 	}
@@ -405,6 +405,7 @@ func main() {
 		router.HandleFunc("/pump", pump).Methods("POST")
 		router.HandleFunc("/status", status).Methods("GET")
 		router.HandleFunc("/tps", tps).Methods("GET")
+		router.HandleFunc("/config", configPool).Methods("GET")
 
 		if err := http.ListenAndServe(args.genTxsPort, cors.AllowAll().Handler(router)); err != nil {
 			panic(err)
@@ -585,6 +586,23 @@ func tps(w http.ResponseWriter, r *http.Request) {
 		Tps: float64(int64(numTxs)/blockTime),
 	})
 
+	respondWithJSON(w, 200, result)
+}
+
+func configPool(w http.ResponseWriter, r *http.Request) {
+	result := make([]Tps, 0)
+
+	workers, err := strconv.ParseInt(r.FormValue("workers"), 10, 64)
+	if err != nil {
+		workers = 5
+	}
+
+	workerCap, err := strconv.ParseInt(r.FormValue("cap"), 10, 64)
+	if err != nil {
+		workerCap = 600
+	}
+
+	kardiaService.TxPool().ResetWorker(int(workers), int(workerCap))
 	respondWithJSON(w, 200, result)
 }
 
