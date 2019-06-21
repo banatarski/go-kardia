@@ -32,7 +32,7 @@ type BaseBlockChain interface {
 	Genesis() *types.Block
 	CurrentHeader() *types.Header
 	CurrentBlock() *types.Block
-	WriteBlockWithoutState(block *types.Block) error
+	WriteBlockWithoutState(block *types.Block, blockParts *types.PartSet) error
 	WriteCommit(height uint64, commit *types.Commit)
 	GetBlock(hash common.Hash, number uint64) *types.Block
 	GetBlockByHeight(height uint64) *types.Block

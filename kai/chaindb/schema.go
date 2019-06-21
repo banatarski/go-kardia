@@ -39,6 +39,8 @@ var (
 
 	blockBodyPrefix     = []byte("b") // blockBodyPrefix + num (uint64 big endian) + hash -> block body
 	blockReceiptsPrefix = []byte("r") // blockReceiptsPrefix + num (uint64 big endian) + hash -> block receipts
+	blockPartPrefix     = []byte("bp")  //blockPartPrefix + blockHeight (uint64 big endian) + index (int) -> block part
+	blockMetaPrefix     = []byte("bm")
 
 	commitPrefix = []byte("c") // commitPrefix + num (uint64 big endian) -> commit
 
@@ -119,6 +121,14 @@ func headerHeightKey(hash common.Hash) []byte {
 // blockBodyKey = blockBodyPrefix + num (uint64 big endian) + hash
 func blockBodyKey(height uint64, hash common.Hash) []byte {
 	return append(append(blockBodyPrefix, encodeBlockHeight(height)...), hash.Bytes()...)
+}
+
+func blockPartKey(height uint64, index uint64) []byte {
+	return append(append(blockPartPrefix, encodeBlockHeight(height)...), encodeBlockHeight(index)...)
+}
+
+func blockMetaKey(height uint64) []byte {
+	return append(blockMetaPrefix, encodeBlockHeight(height)...)
 }
 
 // blockReceiptsKey = blockReceiptsPrefix + num (uint64 big endian) + hash

@@ -43,7 +43,7 @@ func validateBlock(state LastestBlockState, block *types.Block) error {
 	*/
 
 	// validate prev block info
-	if !block.Header().LastBlockID.Equal(state.LastBlockID) {
+	if !block.Header().LastBlockID.Equals(state.LastBlockID) {
 		return fmt.Errorf("Wrong Block.Header.LastBlockID.  Expected %v, got %v", state.LastBlockID, block.Header().LastBlockID)
 	}
 	// TODO(namdoh): Re-enable validating txs

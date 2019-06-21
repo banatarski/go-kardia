@@ -20,6 +20,7 @@ package blockchain
 
 import (
 	"fmt"
+	"github.com/kardiachain/go-kardia/kai/state"
 	"math/big"
 	"sync"
 	"time"
@@ -60,8 +61,7 @@ func (bo *BlockOperations) Height() uint64 {
 }
 
 // CreateProposalBlock creates a new proposal block with all current pending txs in pool.
-func (bo *BlockOperations) CreateProposalBlock(height int64, lastBlockID types.BlockID,
-	lastValidatorHash common.Hash, commit *types.Commit) (block *types.Block) {
+func (bo *BlockOperations) CreateProposalBlock(height int64, latestState state.LastestBlockState, commit *types.Commit, proposer common.Address) (block *types.Block, partSet *types.PartSet) {
 	// Gets all transactions in pending pools and execute them to get new account states.
 	// Tx execution can happen in parallel with voting or precommitted.
 	// For simplicity, this code executes & commits txs before sending proposal,
@@ -69,22 +69,27 @@ func (bo *BlockOperations) CreateProposalBlock(height int64, lastBlockID types.B
 	txs := bo.txPool.ProposeTransactions()
 	//bo.logger.Debug("Collected transactions", "txs", txs)
 
+	lastBlockID := latestState.LastBlockID
+	lastValidatorHash := latestState.LastValidators.Hash()
+
 	header := bo.newHeader(height, uint64(len(txs)), lastBlockID, lastValidatorHash)
 	bo.logger.Info("Creates new header", "header", header)
 
 	stateRoot, receipts, newTxs, err := bo.commitTransactions(txs, header)
 	if err != nil {
 		bo.logger.Error("Fail to commit transactions", "err", err)
-		return nil
+		return nil, nil
 	}
 	header.Root = stateRoot
 
 	block = bo.newBlock(header, newTxs, receipts, commit)
+	partSet = block.MakePartSet(types.BlockPartSizeBytes)
 	bo.logger.Trace("Make block to propose", "blockHeight", block.Height(), "blockHash", block.Hash())
 
+	// TODO: send receipts into a channel so it may be saved later
 	bo.saveReceipts(receipts, block)
 
-	return block
+	return block, partSet
 }
 
 // CommitAndValidateBlockTxs executes and commits the transactions in the given block.
@@ -124,7 +129,7 @@ func (bo *BlockOperations) CommitBlockTxsIfNotFound(block *types.Block) error {
 //             If all the nodes restart after committing a block,
 //             we need this to reload the precommits to catch-up nodes to the
 //             most recent height.  Otherwise they'd stall at H-1.
-func (bo *BlockOperations) SaveBlock(block *types.Block, seenCommit *types.Commit) {
+func (bo *BlockOperations) SaveBlock(block *types.Block, blockParts *types.PartSet, seenCommit *types.Commit) {
 	if block == nil {
 		common.PanicSanity("BlockOperations try to save a nil block")
 	}
@@ -132,14 +137,16 @@ func (bo *BlockOperations) SaveBlock(block *types.Block, seenCommit *types.Commi
 	if g, w := height, bo.Height()+1; g != w {
 		common.PanicSanity(common.Fmt("BlockOperations can only save contiguous blocks. Wanted %v, got %v", w, g))
 	}
+	if !blockParts.IsComplete() {
+		common.PanicSanity(fmt.Sprintf("BlockOperations can only save complete block part sets"))
+	}
 
 	// Save block
 	if height != bo.Height()+1 {
 		common.PanicSanity(common.Fmt("BlockOperations can only save contiguous blocks. Wanted %v, got %v", bo.Height()+1, height))
 	}
 
-	// TODO(kiendn): WriteBlockWithoutState returns an error, write logic check if error appears
-	if err := bo.blockchain.WriteBlockWithoutState(block); err != nil {
+	if err := bo.blockchain.WriteBlockWithoutState(block, blockParts); err != nil {
 		common.PanicSanity(common.Fmt("WriteBlockWithoutState fails with error %v", err))
 	}
 
@@ -154,10 +161,10 @@ func (bo *BlockOperations) SaveBlock(block *types.Block, seenCommit *types.Commi
 	bo.blockchain.WriteCommit(height, seenCommit)
 
 	// TODO(thientn/kiendn): Evaluates remove txs directly here, or depending on txPool.reset() when receiving new block event.
-	txs := block.Transactions()
-	if len(txs) > 0 {
-		bo.txPool.RemoveTxs(txs)
-	}
+	//txs := block.Transactions()
+	//if len(txs) > 0 {
+	//	bo.txPool.RemoveTxs(txs)
+	//}
 
 	bo.mtx.Lock()
 	bo.height = height
@@ -168,6 +175,14 @@ func (bo *BlockOperations) SaveBlock(block *types.Block, seenCommit *types.Commi
 // If no block is found for the given height, it returns nil.
 func (bo *BlockOperations) LoadBlock(height uint64) *types.Block {
 	return bo.blockchain.GetBlockByHeight(height)
+}
+
+func (bo *BlockOperations) LoadBlockMeta(height uint64) *types.BlockMeta {
+	return bo.blockchain.GetBlockMeta(height)
+}
+
+func (bo *BlockOperations) LoadBlockPart(height uint64, index int) *types.Part {
+	return bo.blockchain.GetBlockPart(height, index)
 }
 
 // LoadBlockCommit returns the Commit for the given height.
@@ -210,7 +225,7 @@ func (bo *BlockOperations) newHeader(height int64, numTxs uint64, blockId types.
 // newBlock creates new block from given data.
 func (bo *BlockOperations) newBlock(header *types.Header, txs []*types.Transaction, receipts types.Receipts, commit *types.Commit) *types.Block {
 	block := types.NewBlock(bo.logger, header, txs, receipts, commit)
-
+	bo.logger.Info("newBlock", "hash", block.Hash(), "height", block.Height())
 	// TODO(namdoh): Fill the missing header info: AppHash, ConsensusHash,
 	// LastResultHash.
 

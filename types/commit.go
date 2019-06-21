@@ -46,6 +46,7 @@ func (commit *Commit) Copy() *Commit {
 	if commit.firstPrecommit != nil {
 		commitCopy.firstPrecommit = commit.firstPrecommit.Copy()
 	}
+	commitCopy.BlockID = BlockID{Hash: commit.BlockID.Hash, PartsHeader: commit.BlockID.PartsHeader}
 	commitCopy.Precommits = make([]*Vote, len(commit.Precommits))
 	for i := 0; i < len(commit.Precommits); i++ {
 		if commit.Precommits[i] == nil {
@@ -112,7 +113,7 @@ func (commit *Commit) BitArray() *cmn.BitArray {
 		for i, precommit := range commit.Precommits {
 			// TODO: need to check the BlockID otherwise we could be counting conflicts,
 			// not just the one with +2/3 !
-			commit.bitArray.SetIndex(i, precommit != nil)
+			commit.bitArray.SetIndex(uint(i), precommit != nil)
 		}
 	}
 	return commit.bitArray

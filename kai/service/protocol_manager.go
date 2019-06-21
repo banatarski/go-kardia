@@ -329,6 +329,9 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 	case msg.Code == serviceconst.CsProposalMsg:
 		pm.logger.Trace("Proposal message received")
 		pm.csReactor.ReceiveNewProposal(msg, p.Peer)
+	case msg.Code == serviceconst.CsProposalBlockPartsMsg:
+		pm.logger.Trace("Proposal Block Part message received")
+		pm.csReactor.ReceiveProposalBlockPart(msg, p.Peer)
 	case msg.Code == serviceconst.CsVoteMsg:
 		pm.logger.Trace("Vote messsage received")
 		pm.csReactor.ReceiveNewVote(msg, p.Peer)
@@ -341,9 +344,12 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 	case msg.Code == serviceconst.CsCommitStepMsg:
 		pm.logger.Trace("CommitStep message received")
 		pm.csReactor.ReceiveNewCommit(msg, p.Peer)
-	case msg.Code == serviceconst.CsBlockMsg:
-		pm.logger.Trace("Block message received")
-		pm.csReactor.ReceiveBlock(msg, p.Peer)
+	//case msg.Code == serviceconst.CsBlockMsg:
+	//	pm.logger.Trace("Block message received")
+	//	pm.csReactor.ReceiveBlock(msg, p.Peer)
+	case msg.Code == serviceconst.CsBlockPartMsg:
+		pm.logger.Trace("Block part message received")
+		pm.csReactor.ReceiveBlockPart(msg, p.Peer)
 	case msg.Code == serviceconst.CsVoteSetMaj23Message:
 		pm.logger.Trace("VoteSetMaj23 message received")
 		pm.csReactor.ReceiveVoteSetMaj23(msg, p.Peer)
@@ -394,19 +400,19 @@ func (pm *ProtocolManager) Broadcast(msg interface{}, msgType uint64) {
 
 	// If ok is true, then simplify the log
 	if ok {
-		pm.logger.Info("Start broadcast consensus message", "Height", v.Height, "Block", v.Block.Height(), "msgType", msgType)
+		pm.logger.Info("Start broadcast consensus message", "Height", v.Height, "BlockParts", v.BlockPartsHeader.String(), "msgType", msgType)
 	} else {
 		pm.logger.Info("Start broadcast consensus message", "msg", msg, "msgType", msgType)
 	}
 
 	for _, p := range pm.peers.peers {
-		pm.wg.Add(1)
-		go func(p *peer) {
-			defer pm.wg.Done()
-			if err := p2p.Send(p.rw, msgType, msg); err !=nil {
-				pm.logger.Error("error while broadcasting consensus message", "err", err, "msg", msg, "msgType")
-			}
-		}(p)
+		//pm.wg.Add(1)
+		//go func(p *peer) {
+		//	defer pm.wg.Done()
+		if err := p2p.Send(p.rw, msgType, msg); err !=nil {
+			pm.logger.Error("error while broadcasting consensus message", "err", err, "msg", msg, "msgType")
+		}
+		//}(p)
 	}
 }
 

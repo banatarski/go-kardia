@@ -328,7 +328,7 @@ func main() {
 		return
 	}
 	blockchain = kardiaService.BlockChain()
-	logger.Info("Genesis block", "genesis", *blockchain.Genesis())
+	logger.Info("Genesis block", "genesis", *blockchain.Genesis(), "hash", blockchain.Genesis().Hash().Hex())
 
 	if !args.noProxy && len(args.peerProxyIP) == 0 {
 		logger.Error("flag noProxy=false but peerProxyIP is empty, will ignore proxy.")

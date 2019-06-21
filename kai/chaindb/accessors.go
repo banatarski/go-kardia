@@ -89,6 +89,35 @@ func WriteBlock(db DatabaseWriter, block *types.Block) {
 	WriteHeader(db, block.Header())
 }
 
+// WriteBlockParts writes all block parts to database based on block height and their indices
+func WriteBlockParts(db DatabaseWriter, height uint64, blockParts *types.PartSet) {
+	for i := 0; uint(i) < blockParts.Total(); i++ {
+		part := blockParts.GetPart(i)
+
+		data, err := rlp.EncodeToBytes(part)
+		if err != nil {
+			log.Error("Failed to RLP encode part", "err", err)
+		} else {
+			if err := db.Put(blockPartKey(height, uint64(i)), data); err != nil {
+				log.Error("Failed to save blockPart to database", "err", err, "height", height, "index", i)
+			}
+		}
+
+	}
+}
+
+// WriteBlockMeta writes block meta into database that helps query block parts by height
+func WriteBlockMeta(db DatabaseWriter, height uint64, meta *types.BlockMeta) {
+	data, err := meta.Marshal()
+	if err != nil {
+		log.Error("Failed to encode blockMeta", "err", err)
+	} else {
+		if err := db.Put(blockMetaKey(height), data); err != nil {
+			log.Error("Failed to save blockMeta into database", "err", err, "height", height)
+		}
+	}
+}
+
 // WriteBody stores a block body into the database.
 func WriteBody(db DatabaseWriter, hash common.Hash, height uint64, body *types.Body) {
 	data, err := rlp.EncodeToBytes(body)
@@ -199,6 +228,38 @@ func ReadBlock(logger log.Logger, db DatabaseReader, hash common.Hash, height ui
 		return nil
 	}
 	return types.NewBlockWithHeader(logger, header).WithBody(body)
+}
+
+func ReadBlockMeta(db DatabaseReader, height uint64) *types.BlockMeta {
+	data, err := db.Get(blockMetaKey(height))
+	if err != nil {
+		log.Error("cannot get blockmeta", "err", err, "height", height)
+		return nil
+	}
+
+	blockMeta := new(types.BlockMeta)
+	if err := rlp.DecodeBytes(data, blockMeta); err != nil {
+		log.Error("cannot decode blockMeta data", "err", err, "height", height)
+		return nil
+	}
+
+	return blockMeta
+}
+
+func ReadBlockPart(db DatabaseReader, height uint64, index int) *types.Part {
+	data, err := db.Get(blockPartKey(height, uint64(index)))
+	if err != nil {
+		log.Error("cannot get block part", "err", err, "height", height, "index", index)
+		return nil
+	}
+
+	blockPart := new(types.Part)
+	if err := rlp.DecodeBytes(data, blockPart); err != nil {
+		log.Error("cannot decode block part data", "err", err, "height", height, "index", index)
+		return nil
+	}
+
+	return blockPart
 }
 
 // ReadHeader retrieves the block header corresponding to the hash.

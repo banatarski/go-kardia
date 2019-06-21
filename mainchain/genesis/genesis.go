@@ -159,6 +159,7 @@ func (g *Genesis) ToBlock(logger log.Logger, db kaidb.Database) *types.Block {
 		// Time:           g.Timestamp,
 		GasLimit: g.GasLimit,
 		Root:     root,
+		LastBlockID: types.NewZeroBlockID(),
 	}
 	if g.GasLimit == 0 {
 		head.GasLimit = configs.GenesisGasLimit
@@ -166,7 +167,7 @@ func (g *Genesis) ToBlock(logger log.Logger, db kaidb.Database) *types.Block {
 	statedb.Commit(false)
 	statedb.Database().TrieDB().Commit(root, true)
 
-	return types.NewBlock(logger, head, nil, nil, &types.Commit{})
+	return types.NewBlock(logger, head, nil, nil, &types.Commit{BlockID: types.NewZeroBlockID()})
 }
 
 // Commit writes the block and state of a genesis specification to the database.
@@ -176,6 +177,13 @@ func (g *Genesis) Commit(logger log.Logger, db kaidb.Database) (*types.Block, er
 	if block.Height() != 0 {
 		return nil, fmt.Errorf("can't commit genesis block with height > 0")
 	}
+
+	// Create block part
+	blockParts := block.MakePartSet(types.BlockPartSizeBytes)
+	blockMeta := types.NewBlockMeta(block, blockParts)
+
+	chaindb.WriteBlockMeta(db, block.Height(), blockMeta)
+	chaindb.WriteBlockParts(db, block.Height(), blockParts)
 	chaindb.WriteBlock(db, block)
 	chaindb.WriteReceipts(db, block.Hash(), block.Height(), nil)
 	chaindb.WriteCanonicalHash(db, block.Hash(), block.Height())

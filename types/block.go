@@ -20,6 +20,7 @@ package types
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"io"
@@ -385,7 +386,7 @@ func (b *Block) SetLastCommit(c *Commit) {
 
 func (b *Block) Header() *Header { return CopyHeader(b.header) }
 func (b *Block) HashesTo(id BlockID) bool {
-	return b.Hash().Equal(common.Hash(id))
+	return b.Hash().Equal(id.Hash)
 }
 
 // Size returns the true RLP encoded storage size of the block, either by encoding
@@ -425,7 +426,7 @@ func (b *Block) ValidateBasic() error {
 		}
 	}
 	// TODO(namdoh): Re-enable check for Data hash.
-	b.logger.Info("Block.ValidateBasic() - not yet implement validating data hash.")
+	//b.logger.Info("Block.ValidateBasic() - not yet implement validating data hash.")
 	//if !bytes.Equal(b.DataHash, b.Data.Hash()) {
 	//	return fmt.Errorf("Wrong Block.Header.DataHash.  Expected %v, got %v", b.DataHash, b.Data.Hash())
 	//}
@@ -433,7 +434,7 @@ func (b *Block) ValidateBasic() error {
 	//	return errors.New(cmn.Fmt("Wrong Block.Header.EvidenceHash.  Expected %v, got %v", b.EvidenceHash, b.Evidence.Hash()))
 	//}
 
-	b.logger.Info("Block.ValidateBasic() - implement validate DualEvents.")
+	//b.logger.Info("Block.ValidateBasic() - implement validate DualEvents.")
 
 	return nil
 }
@@ -463,10 +464,6 @@ type writeCounter common.StorageSize
 func (c *writeCounter) Write(b []byte) (int, error) {
 	*c += writeCounter(len(b))
 	return len(b), nil
-}
-
-func (b *Block) BlockID() BlockID {
-	return BlockID(b.Hash())
 }
 
 // Hash returns the keccak256 hash of b's header.
@@ -503,33 +500,77 @@ func (b *Block) MakeEmptyNil() {
 	}
 }
 
-type BlockID common.Hash
+// MakePartSet returns a PartSet containing parts of a serialized block.
+// This is the form in which the block is gossipped to peers.
+// CONTRACT: partSize is greater than zero.
+func (b *Block) MakePartSet(partSize int) *PartSet {
+	if b == nil {
+		return nil
+	}
+	b.mtx.Lock()
+	defer b.mtx.Unlock()
+
+	bz, err := rlp.EncodeToBytes(b)
+	if err != nil {
+		panic(err)
+	}
+	return NewPartSetFromData(bz, partSize)
+}
+
+//--------------------------------------------------------------------------------
+
+// BlockID defines the unique ID of a block as its Hash and its PartSetHeader
+type BlockID struct {
+	Hash        common.Hash       `json:"hash"`
+	PartsHeader PartSetHeader     `json:"parts"`
+}
 
 func NewZeroBlockID() BlockID {
-	return BlockID{}
+	return BlockID{Hash: common.NewZeroHash(), PartsHeader: PartSetHeader{Hash: make(common.HexBytes, 0), Total: 0}}
 }
 
-func (b *BlockID) IsZero() bool {
-	zero := BlockID{}
-	return bytes.Equal(b[:], zero[:])
-}
-
-func (b *BlockID) Equal(id BlockID) bool {
-	return common.Hash(*b).Equal(common.Hash(id))
+// Equals returns true if the BlockID matches the given BlockID
+func (blockID BlockID) Equals(other BlockID) bool {
+	return blockID.Hash.Equal(other.Hash) &&
+		blockID.PartsHeader.Equals(other.PartsHeader)
 }
 
 // Key returns a machine-readable string representation of the BlockID
-func (blockID *BlockID) Key() string {
-	return string(blockID[:])
+func (blockID BlockID) Key() string {
+	bz, err := rlp.EncodeToBytes(blockID.PartsHeader)
+	if err != nil {
+		panic(err)
+	}
+	return blockID.Hash.Hex() + string(bz)
 }
 
-// String returns the first 12 characters of hex string representation of the BlockID
+// ValidateBasic performs basic validation.
+func (blockID BlockID) ValidateBasic() error {
+	// Hash can be empty in case of POLBlockID in Proposal.
+	if err := ValidateHash(blockID.Hash.Bytes()); err != nil {
+		return fmt.Errorf("wrong Hash")
+	}
+	if err := blockID.PartsHeader.ValidateBasic(); err != nil {
+		return fmt.Errorf("wrong PartsHeader: %v", err)
+	}
+	return nil
+}
+
+// IsZero returns true if this is the BlockID of a nil block.
+func (blockID BlockID) IsZero() bool {
+	return blockID.Hash.IsZero() && blockID.PartsHeader.IsZero()
+}
+
+// IsComplete returns true if this is a valid BlockID of a non-nil block.
+func (blockID BlockID) IsComplete() bool {
+	return len(blockID.Hash.Bytes()) == sha256.Size &&
+		blockID.PartsHeader.Total < 0 &&
+		len(blockID.PartsHeader.Hash) == sha256.Size
+}
+
+// String returns a human readable string representation of the BlockID
 func (blockID BlockID) String() string {
-	return common.Hash(blockID).Fingerprint()
-}
-
-func (blockID BlockID) StringLong() string {
-	return common.Hash(blockID).Hex()
+	return fmt.Sprintf(`%v:%v`, blockID.Hash.String(), blockID.PartsHeader)
 }
 
 type Blocks []*Block

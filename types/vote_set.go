@@ -21,6 +21,7 @@ package types
 import (
 	"bytes"
 	"fmt"
+	"github.com/kardiachain/go-kardia/lib/log"
 	"sync"
 
 	cmn "github.com/kardiachain/go-kardia/lib/common"
@@ -186,11 +187,12 @@ func (voteSet *VoteSet) getVote(valIndex int, blockKey string) (vote *Vote, ok b
 // Assumes signature is valid.
 // If conflicting vote exists, returns it.
 func (voteSet *VoteSet) addVerifiedVote(vote *Vote, blockKey string, votingPower int64) (added bool, conflicting *Vote) {
+	log.Debug("addVerifiedVote", "blockId", vote.BlockID.String(), "voteSet", voteSet.votesByBlock[blockKey])
 	valIndex := vote.ValidatorIndex.Int32()
 
 	// Already exists in voteSet.votes?
 	if existing := voteSet.votes[valIndex]; existing != nil {
-		if existing.BlockID.Equal(vote.BlockID) {
+		if existing.BlockID.Equals(vote.BlockID) {
 			cmn.PanicSanity("addVerifiedVote does not expect duplicate votes")
 		} else {
 			conflicting = existing
@@ -198,13 +200,13 @@ func (voteSet *VoteSet) addVerifiedVote(vote *Vote, blockKey string, votingPower
 		// Replace vote if blockKey matches voteSet.maj23.
 		if voteSet.maj23 != nil && voteSet.maj23.Key() == blockKey {
 			voteSet.votes[valIndex] = vote
-			voteSet.votesBitArray.SetIndex(valIndex, true)
+			voteSet.votesBitArray.SetIndex(uint(valIndex), true)
 		}
 		// Otherwise don't add it to voteSet.votes
 	} else {
 		// Add to voteSet.votes and incr .sum
 		voteSet.votes[valIndex] = vote
-		voteSet.votesBitArray.SetIndex(valIndex, true)
+		voteSet.votesBitArray.SetIndex(uint(valIndex), true)
 		voteSet.sum += uint64(votingPower)
 	}
 
@@ -235,11 +237,12 @@ func (voteSet *VoteSet) addVerifiedVote(vote *Vote, blockKey string, votingPower
 
 	// Add vote to votesByBlock
 	votesByBlock.addVerifiedVote(vote, votingPower)
+	log.Debug("get origSum & quorum", "origSum", origSum, "quorum", quorum, "votesByBlock", voteSet.votesByBlock[blockKey].sum)
 
 	// If we just crossed the quorum threshold and have 2/3 majority...
 	if origSum < quorum && quorum <= votesByBlock.sum {
 		// Only consider the first quorum reached
-		if voteSet.maj23 == nil {
+		if voteSet.maj23 == nil /* && !vote.BlockID.Hash.IsZero()*/ {
 			maj23BlockID := vote.BlockID
 			voteSet.maj23 = &maj23BlockID
 			// And also copy votes over to voteSet.votes
@@ -270,7 +273,7 @@ func (voteSet *VoteSet) SetPeerMaj23(peerID discover.NodeID, blockID BlockID) er
 
 	// Make sure peer hasn't already told us something.
 	if existing, ok := voteSet.peerMaj23s[peerID]; ok {
-		if existing.Equal(blockID) {
+		if existing.Equals(blockID) {
 			return nil // Nothing to do
 		}
 		return fmt.Errorf("SetPeerMaj23: Received conflicting blockID from peer %v. Got %v, expected %v",
@@ -367,7 +370,7 @@ func (voteSet *VoteSet) IsCommit() bool {
 	}
 	voteSet.mtx.Lock()
 	defer voteSet.mtx.Unlock()
-	return voteSet.maj23 != nil
+	return voteSet.maj23 != nil && !voteSet.maj23.Hash.IsZero()
 }
 
 func (voteSet *VoteSet) GetByAddress(address cmn.Address) *Vote {
@@ -389,7 +392,7 @@ func (voteSet *VoteSet) HasTwoThirdsMajority() bool {
 	}
 	voteSet.mtx.Lock()
 	defer voteSet.mtx.Unlock()
-	return voteSet.maj23 != nil
+	return voteSet.maj23 != nil && !voteSet.maj23.Hash.IsZero()
 }
 
 func (voteSet *VoteSet) HasTwoThirdsAny() bool {
@@ -415,7 +418,7 @@ func (voteSet *VoteSet) TwoThirdsMajority() (blockID BlockID, ok bool) {
 	}
 	voteSet.mtx.Lock()
 	defer voteSet.mtx.Unlock()
-	if voteSet.maj23 != nil {
+	if voteSet.maj23 != nil && !voteSet.maj23.Hash.IsZero() {
 		return *voteSet.maj23, true
 	}
 	return NewZeroBlockID(), false
@@ -486,8 +489,9 @@ func newBlockVotes(peerMaj23 bool, numValidators int) *blockVotes {
 
 func (vs *blockVotes) addVerifiedVote(vote *Vote, votingPower int64) {
 	valIndex := vote.ValidatorIndex.Int32()
+	log.Debug("addVerifiedVote - blockVotes", "valIndex", valIndex, "not existing", vs.votes[valIndex] == nil, "votingPower", votingPower)
 	if existing := vs.votes[valIndex]; existing == nil {
-		vs.bitArray.SetIndex(valIndex, true)
+		vs.bitArray.SetIndex(uint(valIndex), true)
 		vs.votes[valIndex] = vote
 		vs.sum += votingPower
 	}

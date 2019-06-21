@@ -345,7 +345,7 @@ func (valSet *ValidatorSet) VerifyCommit(chainID string, blockID BlockID, height
 		if !val.VerifyVoteSignature(chainID, precommit) {
 			return fmt.Errorf("Invalid commit -- invalid signature: %v", precommit)
 		}
-		if !blockID.Equal(precommit.BlockID) {
+		if !blockID.Equals(precommit.BlockID) {
 			continue // Not an error, but doesn't count
 		}
 		// Good precommit!

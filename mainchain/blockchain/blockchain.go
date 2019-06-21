@@ -187,16 +187,36 @@ func (bc *BlockChain) GetBlockByHeight(height uint64) *types.Block {
 // caching it if found.
 func (bc *BlockChain) GetBlock(hash common.Hash, number uint64) *types.Block {
 	// Short circuit if the block's already in the cache, retrieve otherwise
-	if block, ok := bc.blockCache.Get(hash); ok {
-		return block.(*types.Block)
-	}
+	//if block, ok := bc.blockCache.Get(hash); ok {
+	//	return block.(*types.Block)
+	//}
 	block := chaindb.ReadBlock(bc.logger, bc.db, hash, number)
 	if block == nil {
 		return nil
 	}
 	// Cache the found block for next time and return
-	bc.blockCache.Add(block.Hash(), block)
+	//bc.blockCache.Add(block.Hash(), block)
 	return block
+}
+
+// GetBlockMeta retrieves a blockmeta from the database by block number,
+func (bc *BlockChain) GetBlockMeta(number uint64) *types.BlockMeta {
+	// Short circuit if the block's already in the cache, retrieve otherwise
+	blockMeta := chaindb.ReadBlockMeta(bc.db, number)
+	if blockMeta == nil {
+		return nil
+	}
+	return blockMeta
+}
+
+// GetBlockPart retrieves a block part from the database by block number and index,
+func (bc *BlockChain) GetBlockPart(number uint64, index int) *types.Part {
+	// Short circuit if the block's already in the cache, retrieve otherwise
+	part := chaindb.ReadBlockPart(bc.db, number, index)
+	if part == nil {
+		return nil
+	}
+	return part
 }
 
 // GetHeader retrieves a block header from the database by hash and height,
@@ -375,13 +395,18 @@ func (bc *BlockChain) SetHead(head uint64) error {
 }
 
 // WriteBlockWithoutState writes only new block to database.
-func (bc *BlockChain) WriteBlockWithoutState(block *types.Block) error {
+func (bc *BlockChain) WriteBlockWithoutState(block *types.Block, blockParts *types.PartSet) error {
 	// Makes sure no inconsistent state is leaked during insertion
 	bc.mu.Lock()
 	defer bc.mu.Unlock()
 	// Write block data in batch
 	batch := bc.db.NewBatch()
 	chaindb.WriteBlock(batch, block)
+
+	// write blockparts data in batch
+	blockMeta := types.NewBlockMeta(block, blockParts)
+	chaindb.WriteBlockMeta(batch, block.Height(), blockMeta)
+	chaindb.WriteBlockParts(batch, block.Height(), blockParts)
 
 	// Convert all txs into txLookupEntries and store to db
 	chaindb.WriteTxLookupEntries(batch, block)
