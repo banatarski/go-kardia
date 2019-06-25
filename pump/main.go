@@ -152,7 +152,7 @@ func runtimeSystemSettings() error {
 
 // removeDirContents deletes old local node directory
 func removeDirContents(dir string) error {
-	log.Info("Remove directory", "dir", dir)
+	// log.Info("Remove directory", "dir", dir)
 	_, err := os.Stat(dir)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -282,12 +282,12 @@ func main() {
 		PriceLimit:   1,
 		PriceBump:    10,
 		AccountSlots: 16,
-		GlobalSlots:  25000, // for pending
+		GlobalSlots:  30000, // for pending
 		AccountQueue: 64,
-		GlobalQueue:  250000, // for all
+		GlobalQueue:  300000, // for all
 		Lifetime: 3 * time.Hour,
-		NumberOfWorkers: 2,
-		WorkerCap: 1800,
+		NumberOfWorkers: 3,
+		WorkerCap: 1500,
 		BlockSize: 10000,
 	}
 	config.MainChainConfig.IsZeroFee = args.isZeroFee
@@ -443,26 +443,24 @@ func waitForever() {
 // genTxsLoop generate & add a batch of transfer txs, repeat after delay flag.
 // Warning: Set txsDelay < 5 secs may build up old subroutines because previous subroutine to add txs won't be finished before new one starts.
 func genTxsLoop(txPool *tx_pool.TxPool) {
-	time.Sleep(20 * time.Second) //decrease it if you want to test it locally
-	genRound := 0
+	time.Sleep(25 * time.Second) //decrease it if you want to test it locally
 	genTool = NewGeneratorTool(accounts, make(map[string]uint64))
 	for {
-		genTxs(genTool, uint64(args.numTxs), txPool, uint64(genRound))
-		genRound++
+		genTxs(genTool, uint64(args.numTxs), txPool)
 		time.Sleep(time.Duration(args.txsDelay) * time.Second)
 	}
 }
 
-func genTxs(genTool *GeneratorTool, numTxs uint64, txPool *tx_pool.TxPool, genRound uint64) {
-	txList := genTool.GenerateRandomTxWithState(numTxs, genRound)
-	log.Info("GenTxs Adding new transactions", "num", numTxs, "genRound", genRound, "generatedTxList", len(txList), "pendingPool", txPool.PendingSize())
+func genTxs(genTool *GeneratorTool, numTxs uint64, txPool *tx_pool.TxPool) {
+	txList := genTool.GenerateRandomTxWithState(numTxs)
+	// log.Info("GenTxs Adding new transactions", "num", numTxs, "generatedTxList", len(txList), "pendingPool", txPool.PendingSize())
 	if err := txPool.AddTxs(txList); err != nil {
 		log.Error("Error while adding txs", "err", err)
 	}
 }
 
 func pump(w http.ResponseWriter, r *http.Request) {
-	log.Info("pumping txs")
+	// log.Info("pumping txs")
 	data, err := HandlePost(r)
 	if err != nil {
 		respondWithError(w, 500, fmt.Sprintf("%v", err))
