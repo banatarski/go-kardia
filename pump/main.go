@@ -282,13 +282,13 @@ func main() {
 		PriceLimit:   1,
 		PriceBump:    10,
 		AccountSlots: 16,
-		GlobalSlots:  98304, // for pending
+		GlobalSlots:  8192, // for pending
 		AccountQueue: 64,
-		GlobalQueue:  983040, // for all
+		GlobalQueue:  81920, // for all
 		Lifetime: 3 * time.Hour,
 		NumberOfWorkers: 3,
 		WorkerCap: 512,
-		BlockSize: 6144,
+		BlockSize: 8192,
 	}
 	config.MainChainConfig.IsZeroFee = args.isZeroFee
 	config.MainChainConfig.IsPrivate = args.isPrivate
