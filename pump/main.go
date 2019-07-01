@@ -22,7 +22,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"github.com/rs/cors"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -32,11 +31,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/rs/cors"
+
 	"github.com/gorilla/mux"
 	"github.com/kardiachain/go-kardia/dev"
 	"github.com/kardiachain/go-kardia/lib/log"
 	"github.com/kardiachain/go-kardia/lib/sysutils"
-	"github.com/kardiachain/go-kardia/mainchain"
+	kai "github.com/kardiachain/go-kardia/mainchain"
 	bc "github.com/kardiachain/go-kardia/mainchain/blockchain"
 	"github.com/kardiachain/go-kardia/mainchain/genesis"
 	"github.com/kardiachain/go-kardia/mainchain/tx_pool"
@@ -78,17 +79,17 @@ type flagArgs struct {
 }
 
 type Response struct {
-	NumTxs   int             `json:"numTxs"`
-	Delay    int             `json:"delay"`
-	Accounts []Account       `json:"accounts"`
-	Pending  int64           `json:"pending"`
+	NumTxs   int       `json:"numTxs"`
+	Delay    int       `json:"delay"`
+	Accounts []Account `json:"accounts"`
+	Pending  int64     `json:"pending"`
 }
 
 type Tps struct {
-	Blocks     uint64     `json:"blocks"`
-	BlockTime  int64   `json:"blockTime"`
-	Txs        uint64     `json:"txs"`
-	Tps        float64 `json:"tps"`
+	Blocks    uint64  `json:"blocks"`
+	BlockTime int64   `json:"blockTime"`
+	Txs       uint64  `json:"txs"`
+	Tps       float64 `json:"tps"`
 }
 
 var args flagArgs
@@ -131,7 +132,7 @@ func init() {
 	flag.StringVar(&args.peerProxyIP, "peerProxyIP", "", "IP of the peer proxy for this node to register.")
 	flag.IntVar(&args.numTxs, "numTxs", 0, "number of of generated txs in one batch")
 	flag.IntVar(&args.txsDelay, "txsDelay", 1000, "delay in seconds between batches of generated txs")
-	flag.StringVar(&args.genTxsPort,"genTxsPort",":5000", "port of generate tx")
+	flag.StringVar(&args.genTxsPort, "genTxsPort", ":5000", "port of generate tx")
 	flag.IntVar(&args.index, "index", 1, "")
 }
 
@@ -277,18 +278,18 @@ func main() {
 	}
 	nodeDir := filepath.Join(config.DataDir, config.Name)
 	config.MainChainConfig.TxPool = tx_pool.TxPoolConfig{
-		Journal:   filepath.Join(nodeDir, "transactions.rlp"),
-		Rejournal: time.Hour,
-		PriceLimit:   1,
-		PriceBump:    10,
-		AccountSlots: 16,
-		GlobalSlots:  10240, // for pending
-		AccountQueue: 64,
-		GlobalQueue:  102400, // for all
-		Lifetime: 1 * time.Hour,
-		NumberOfWorkers: 5,
-		WorkerCap: 256,
-		BlockSize: 8192,
+		Journal:         filepath.Join(nodeDir, "transactions.rlp"),
+		Rejournal:       time.Hour,
+		PriceLimit:      1,
+		PriceBump:       10,
+		AccountSlots:    16,
+		GlobalSlots:     4096, // for pending
+		AccountQueue:    64,
+		GlobalQueue:     2048, // for all
+		Lifetime:        1 * time.Hour,
+		NumberOfWorkers: 2,
+		WorkerCap:       1024,
+		BlockSize:       8192,
 	}
 	config.MainChainConfig.IsZeroFee = args.isZeroFee
 	config.MainChainConfig.IsPrivate = args.isPrivate
@@ -414,7 +415,7 @@ func main() {
 	go genTxsLoop(kardiaService.TxPool())
 
 	// start an api that receives pump configure
-	go func(){
+	go func() {
 		router := mux.NewRouter()
 		router.HandleFunc("/pump", pump).Methods("POST")
 		router.HandleFunc("/status", status).Methods("GET")
@@ -534,7 +535,7 @@ func pump(w http.ResponseWriter, r *http.Request) {
 		for _, acc := range accs {
 			m := acc.(map[string]interface{})
 			account := Account{
-				Address: m["address"].(string),
+				Address:    m["address"].(string),
 				PrivateKey: m["privateKey"].(string),
 			}
 			accounts = append(accounts, account)
@@ -551,10 +552,10 @@ func pump(w http.ResponseWriter, r *http.Request) {
 func status(w http.ResponseWriter, r *http.Request) {
 
 	response := Response{
-		NumTxs: args.numTxs,
-		Delay: args.txsDelay,
+		NumTxs:   args.numTxs,
+		Delay:    args.txsDelay,
 		Accounts: accounts,
-		Pending: kardiaService.TxPool().PendingSize(),
+		Pending:  kardiaService.TxPool().PendingSize(),
 	}
 
 	respondWithJSON(w, 200, response)
@@ -592,10 +593,10 @@ func tps(w http.ResponseWriter, r *http.Request) {
 	}
 
 	result = append(result, Tps{
-		Blocks: uint64(blocks),
+		Blocks:    uint64(blocks),
 		BlockTime: blockTime,
-		Txs: numTxs,
-		Tps: float64(int64(numTxs)/blockTime),
+		Txs:       numTxs,
+		Tps:       float64(int64(numTxs) / blockTime),
 	})
 
 	respondWithJSON(w, 200, result)
