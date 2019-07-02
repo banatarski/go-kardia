@@ -94,8 +94,24 @@ func (state LastestBlockState) IsEmpty() bool {
 
 // Stringshort returns a short string representing State
 func (state LastestBlockState) String() string {
+
+	var lastBlockTime time.Time
+	if state.LastBlockTime != nil {
+		lastBlockTime = time.Unix(state.LastBlockTime.Int64(), 0)
+	}
+
+	var lastBlockTotalTx cmn.BigInt
+	if state.LastBlockTotalTx != nil {
+		lastBlockTotalTx = *state.LastBlockTotalTx
+	}
+
+	var lastBlockHeight cmn.BigInt
+	if state.LastBlockTotalTx != nil {
+		lastBlockTotalTx = *state.LastBlockHeight
+	}
+
 	return fmt.Sprintf("{ChainID:%v LastBlockHeight:%v LastBlockTotalTx:%v LastBlockID:%v LastBlockTime:%v Validators:%v LastValidators:%v LastHeightValidatorsChanged:%v",
-		state.ChainID, state.LastBlockHeight, state.LastBlockTotalTx, state.LastBlockID, time.Unix(state.LastBlockTime.Int64(), 0),
+		state.ChainID, &lastBlockHeight, &lastBlockTotalTx, state.LastBlockID, &lastBlockTime,
 		state.Validators, state.LastValidators, state.LastHeightValidatorsChanged)
 }
 
