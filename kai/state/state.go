@@ -111,7 +111,7 @@ func (state LastestBlockState) String() string {
 	}
 
 	return fmt.Sprintf("{ChainID:%v LastBlockHeight:%v LastBlockTotalTx:%v LastBlockID:%v LastBlockTime:%v Validators:%v LastValidators:%v LastHeightValidatorsChanged:%v",
-		state.ChainID, &lastBlockHeight, &lastBlockTotalTx, state.LastBlockID, &lastBlockTime,
+		state.ChainID, &lastBlockHeight, &lastBlockTotalTx, state.LastBlockID, lastBlockTime,
 		state.Validators, state.LastValidators, state.LastHeightValidatorsChanged)
 }
 
