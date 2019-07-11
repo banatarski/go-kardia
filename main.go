@@ -21,7 +21,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"math/rand"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -769,8 +768,7 @@ func main() {
 	go displayKardiaPeers(n)
 
 	if args.dev && args.txs {
-		randomTxs := rand.Intn(args.numTxsMax-args.numTxsMin) + args.numTxsMax
-		go genTxsLoop(randomTxs, kardiaService.TxPool())
+		go genTxsLoop(args.numTxsMin, args.numTxsMax, kardiaService.TxPool())
 	}
 
 	waitForever()
@@ -800,7 +798,7 @@ func displaySyncStatus(client *eth.EthClient) {
 // Warning: Set txsDelay < 5 secs may build up old subroutines because previous subroutine to add txs won't be finished before new one starts.
 func genTxsLoop(numTxs int, txPool *tx_pool.TxPool) {
 	genTool := tool.NewGeneratorTool()
-	time.Sleep(60 * time.Second)
+	time.Sleep(30 * time.Second)
 	genRound := 0
 	for {
 		go genTxs(genTool, numTxs, txPool, genRound)
@@ -809,11 +807,11 @@ func genTxsLoop(numTxs int, txPool *tx_pool.TxPool) {
 	}
 }
 
-func genTxs(genTool *tool.GeneratorTool, numTxs int, txPool *tx_pool.TxPool, genRound int) {
+func genTxs(genTool *tool.GeneratorTool, numTxsMin int, numTxsMax int, txPool *tx_pool.TxPool, genRound int) {
 	goodCount := 0
 	badCount := 0
-	txList := genTool.GenerateRandomTxWithState(numTxs, txPool.State().StateDB)
-	log.Info("GenTxs Adding new transactions", "num", numTxs, "genRound", genRound)
+	txList := genTool.GenerateRandomTxWithState(numTxsMin, numTxsMax, txPool.State().StateDB)
+	log.Info("GenTxs Adding new transactions", "num", "genRound", genRound)
 	errs := txPool.AddLocals(txList)
 	for _, err := range errs {
 		if err != nil {

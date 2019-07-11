@@ -108,14 +108,11 @@ func (genTool *GeneratorTool) GenerateTx(numTx int) []*types.Transaction {
 	return result
 }
 
-func (genTool *GeneratorTool) GenerateRandomTxWithState(numTx int, stateDb *state.StateDB) []*types.Transaction {
-	if numTx <= 0 {
-		numTx = defaultNumTx
-	}
-
-	result := make([]*types.Transaction, numTx)
+func (genTool *GeneratorTool) GenerateRandomTxWithState(numTxsMin int, numTxsMax int, stateDb *state.StateDB) []*types.Transaction {
+	randomNumberOfTxs := RandomInt(numTxsMin, numTxsMax)
+	result := make([]*types.Transaction, randomNumberOfTxs)
 	genTool.mu.Lock()
-	for i := 0; i < numTx; i++ {
+	for i := 0; i < randomNumberOfTxs; i++ {
 		senderKey, toAddr := randomTxAddresses()
 		senderPublicKey := crypto.PubkeyToAddress(senderKey.PublicKey)
 		nonce := stateDb.GetNonce(senderPublicKey)
