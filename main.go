@@ -183,8 +183,8 @@ func init() {
 	flag.Uint64Var(&args.devDualChainID, "devDualChainID", eth.EthDualChainID, "manually set dualchain ID. Note that this flag only has effect when --dev flag is set")
 	flag.BoolVar(&args.txs, "txs", false, "generate random transfer txs")
 	flag.IntVar(&args.txsDelay, "txsDelay", 10, "delay in seconds between batches of generated txs")
-	flag.IntVar(&args.numTxsMin, "numTxsMin", 100, "minimum number of generating random txs in one batch")
-	flag.IntVar(&args.numTxsMax, "numTxsMin", 1000, "maximum number of generating random txs in one batch")
+	flag.IntVar(&args.numTxsMin, "numTxsMin", 256, "minimum number of generating random txs in one batch")
+	flag.IntVar(&args.numTxsMax, "numTxsMax", 1024, "maximum number of generating random txs in one batch")
 	flag.BoolVar(&args.dualEvent, "dualEvent", false, "generate initial dual event")
 }
 
