@@ -797,7 +797,7 @@ func displaySyncStatus(client *eth.EthClient) {
 
 // genTxsLoop generate & add a batch of transfer txs, repeat after delay flag.
 // Warning: Set txsDelay < 5 secs may build up old subroutines because previous subroutine to add txs won't be finished before new one starts.
-func genTxsLoop(numTxs int, txPool *tx_pool.TxPool) {
+func genTxsLoop(numTxsMin int, numTxsMax int, txPool *tx_pool.TxPool) {
 	genTool := tool.NewGeneratorTool()
 	time.Sleep(60 * time.Second)
 	genRound := 0
