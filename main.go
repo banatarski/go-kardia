@@ -21,13 +21,13 @@ package main
 import (
 	"flag"
 	"fmt"
+	"math/rand"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
 	"time"
-	"math/rand"
 
 	ethlog "github.com/ethereum/go-ethereum/log"
 	"github.com/kardiachain/go-kardia/configs"
@@ -42,12 +42,12 @@ import (
 	"github.com/kardiachain/go-kardia/dualnode/tron"
 	"github.com/kardiachain/go-kardia/lib/log"
 	"github.com/kardiachain/go-kardia/lib/sysutils"
-	"github.com/kardiachain/go-kardia/mainchain"
+	kai "github.com/kardiachain/go-kardia/mainchain"
 	"github.com/kardiachain/go-kardia/mainchain/genesis"
 	"github.com/kardiachain/go-kardia/mainchain/tx_pool"
 	"github.com/kardiachain/go-kardia/node"
-	"github.com/kardiachain/go-kardia/types"
 	"github.com/kardiachain/go-kardia/tool"
+	"github.com/kardiachain/go-kardia/types"
 )
 
 // args
@@ -405,7 +405,7 @@ func main() {
 				panic("--dualProtocolName is empty")
 			}
 			config.DualChainConfig.DualProtocolName = args.dualProtocolName
- 		}
+		}
 		n.RegisterService(dualservice.NewDualService)
 	}
 
@@ -769,7 +769,7 @@ func main() {
 	go displayKardiaPeers(n)
 
 	if args.dev && args.txs {
-		go genTxsLoop(args.numTxsMin, args.numTxsMax kardiaService.TxPool())
+		go genTxsLoop(args.numTxsMin, args.numTxsMax, kardiaService.TxPool())
 	}
 
 	waitForever()
