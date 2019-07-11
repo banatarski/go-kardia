@@ -769,7 +769,7 @@ func main() {
 	go displayKardiaPeers(n)
 
 	if args.dev && args.txs {
-		go genTxsLoop(args.numTxsMin, args.numTxsMax, kardiaService.TxPool())
+		genTxsLoop(args.numTxsMin, args.numTxsMax, kardiaService.TxPool())
 	}
 
 	waitForever()
