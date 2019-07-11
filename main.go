@@ -27,6 +27,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"math/rand"
 
 	ethlog "github.com/ethereum/go-ethereum/log"
 	"github.com/kardiachain/go-kardia/configs"
@@ -114,7 +115,8 @@ type flagArgs struct {
 	devDualChainID uint64
 	txs            bool
 	txsDelay       int
-	numTxs         int
+	numTxsMin      int
+	numTxsMax      int
 	dualEvent      bool
 }
 
@@ -182,7 +184,8 @@ func init() {
 	flag.Uint64Var(&args.devDualChainID, "devDualChainID", eth.EthDualChainID, "manually set dualchain ID. Note that this flag only has effect when --dev flag is set")
 	flag.BoolVar(&args.txs, "txs", false, "generate random transfer txs")
 	flag.IntVar(&args.txsDelay, "txsDelay", 10, "delay in seconds between batches of generated txs")
-	flag.IntVar(&args.numTxs, "numTxs", 10, "number of of generated txs in one batch")
+	flag.IntVar(&args.numTxsMin, "numTxsMin", 100, "minimum number of generating random txs in one batch")
+	flag.IntVar(&args.numTxsMax, "numTxsMin", 1000, "maximum number of generating random txs in one batch")
 	flag.BoolVar(&args.dualEvent, "dualEvent", false, "generate initial dual event")
 }
 
@@ -766,7 +769,7 @@ func main() {
 	go displayKardiaPeers(n)
 
 	if args.dev && args.txs {
-		go genTxsLoop(args.numTxs, kardiaService.TxPool())
+		go genTxsLoop(args.numTxsMin, args.numTxsMax kardiaService.TxPool())
 	}
 
 	waitForever()
@@ -799,7 +802,7 @@ func genTxsLoop(numTxs int, txPool *tx_pool.TxPool) {
 	time.Sleep(60 * time.Second)
 	genRound := 0
 	for {
-		go genTxs(genTool, numTxs, txPool, genRound)
+		go genTxs(genTool, numTxsMin, numTxsMax, txPool, genRound)
 		genRound++
 		time.Sleep(time.Duration(args.txsDelay) * time.Second)
 	}
@@ -807,8 +810,9 @@ func genTxsLoop(numTxs int, txPool *tx_pool.TxPool) {
 
 func genTxs(genTool *tool.GeneratorTool, numTxs int, txPool *tx_pool.TxPool, genRound int) {
 	goodCount := 0
-	badCount := 0
-	txList := genTool.GenerateRandomTxWithState(numTxs, txPool.State().StateDB)
+	badCount := 
+	randomTxs := rand.Intn(numTxsMax-numTxsMin) + numTxsMin
+	txList := genTool.GenerateRandomTxWithState(randomTxs, txPool.State().StateDB)
 	log.Info("GenTxs Adding new transactions", "num", numTxs, "genRound", genRound)
 	errs := txPool.AddLocals(txList)
 	for _, err := range errs {
