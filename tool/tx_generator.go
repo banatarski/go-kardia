@@ -131,8 +131,8 @@ func (genTool *GeneratorTool) GenerateRandomTxWithState(numTxsMin int, numTxsMax
 			nonce,
 			toAddr,
 			amount,
-			1000,
-			big.NewInt(1),
+			defaultGasLimit,
+			defaultGasPrice,
 			nil,
 		), senderKey)
 		if err != nil {

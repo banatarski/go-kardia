@@ -226,7 +226,7 @@ func (cfg *ConsensusConfig) PeerQueryMaj23Sleep() time.Duration {
 
 // ======================= Genesis Const =======================
 
-var InitValue = big.NewInt(int64(math.Pow10(32))) // Update Genesis Account Values
+var InitValue = big.NewInt(int64(math.Pow10(16))) // Update Genesis Account Values
 var InitValueInCell = InitValue.Mul(InitValue, big.NewInt(int64(math.Pow10(18))))
 
 // GenesisAccounts are used to initialized accounts in genesis block
