@@ -333,7 +333,15 @@ func (a *PublicTransactionAPI) PendingTransactions() ([]*PublicTransaction, erro
 func (a *PublicTransactionAPI) GetTransaction(hash string) *PublicTransaction {
 	txHash := common.HexToHash(hash)
 	tx, blockHash, height, index := chaindb.ReadTransaction(a.s.kaiDb, txHash)
-	return NewPublicTransaction(tx, blockHash, height, index)
+	publicTx := NewPublicTransaction(tx, blockHash, height, index)
+	// get block by block height
+	block := a.s.blockchain.GetBlockByHeight(height)
+	if block == nil {
+		return nil
+	}
+	// get block time from block
+	publicTx.Time = block.Header().Time.Int64()
+	return publicTx
 }
 
 func getReceipts(kaiDb storage.Database, hash common.Hash) (types.Receipts, error) {
