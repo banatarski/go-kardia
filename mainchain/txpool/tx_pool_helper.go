@@ -21,7 +21,6 @@ package txpool
 import (
 	"container/heap"
 	"errors"
-	"fmt"
 	"io"
 	"math"
 	"math/big"
@@ -29,8 +28,6 @@ import (
 	"runtime"
 	"sort"
 
-	"github.com/kardiachain/go-kardia/configs"
-	"github.com/kardiachain/go-kardia/kvm"
 	"github.com/kardiachain/go-kardia/lib/common"
 	"github.com/kardiachain/go-kardia/lib/log"
 	"github.com/kardiachain/go-kardia/lib/rlp"

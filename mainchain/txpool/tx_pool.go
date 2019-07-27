@@ -16,7 +16,7 @@
  *  along with the go-kardia library. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package txpools
+package txpool
 
 import (
 	"errors"
@@ -55,7 +55,7 @@ var (
 
 	// ErrNonceTooHigh is returned if the nonce of a transaction is higher than the
 	// one present in the local chain.
-	ErrNonceTooHigh = errors.New("nonce too low")
+	ErrNonceTooHigh = errors.New("nonce too high")
 
 	// ErrUnderpriced is returned if a transaction's gas price is below the minimum
 	// configured for the transaction pool.
@@ -610,13 +610,13 @@ func (pool *TxPool) validateTx(tx *types.Transaction, local bool) error {
 		return ErrInsufficientFunds
 	}
 
-	intrGas, err := IntrinsicGas(tx.Data(), tx.To() == nil)
+	// intrGas, err := IntrinsicGas(tx.Data(), tx.To() == nil)
 	if err != nil {
 		return err
 	}
-	if tx.Gas() < intrGas {
-		return ErrIntrinsicGas
-	}
+	// if tx.Gas() < intrGas {
+	// 	return ErrIntrinsicGas
+	// }
 
 	return nil
 }
