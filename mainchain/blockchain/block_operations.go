@@ -27,8 +27,8 @@ import (
 	"github.com/kardiachain/go-kardia/kvm"
 	"github.com/kardiachain/go-kardia/lib/common"
 	"github.com/kardiachain/go-kardia/lib/log"
+	"github.com/kardiachain/go-kardia/mainchain/txpool"
 	"github.com/kardiachain/go-kardia/types"
-	"github.com/kardiachain/go-kardia/mainchain/tx_pool"
 )
 
 // TODO(thientn/namdoh): this is similar to execution.go & validation.go in state/
@@ -40,12 +40,12 @@ type BlockOperations struct {
 	mtx sync.RWMutex
 
 	blockchain *BlockChain
-	txPool     *tx_pool.TxPool
+	txPool     *txpool.TxPool
 	height     uint64
 }
 
 // NewBlockOperations returns a new BlockOperations with reference to the latest state of blockchain.
-func NewBlockOperations(logger log.Logger, blockchain *BlockChain, txPool *tx_pool.TxPool) *BlockOperations {
+func NewBlockOperations(logger log.Logger, blockchain *BlockChain, txPool *txpool.TxPool) *BlockOperations {
 	return &BlockOperations{
 		logger:     logger,
 		blockchain: blockchain,

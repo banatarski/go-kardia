@@ -41,9 +41,9 @@ import (
 	"github.com/kardiachain/go-kardia/dualnode/tron"
 	"github.com/kardiachain/go-kardia/lib/log"
 	"github.com/kardiachain/go-kardia/lib/sysutils"
-	"github.com/kardiachain/go-kardia/mainchain"
+	kai "github.com/kardiachain/go-kardia/mainchain"
 	"github.com/kardiachain/go-kardia/mainchain/genesis"
-	"github.com/kardiachain/go-kardia/mainchain/tx_pool"
+	"github.com/kardiachain/go-kardia/mainchain/txpool"
 	"github.com/kardiachain/go-kardia/node"
 	"github.com/kardiachain/go-kardia/tool"
 	"github.com/kardiachain/go-kardia/types"
@@ -339,7 +339,7 @@ func main() {
 		config.MainChainConfig.Genesis = genesis.DefaulTestnetFullGenesisBlock(configs.GenesisAccounts, configs.GenesisContracts)
 	}
 	nodeDir := filepath.Join(config.DataDir, config.Name)
-	config.MainChainConfig.TxPool = *tx_pool.GetDefaultTxPoolConfig(nodeDir)
+	config.MainChainConfig.TxPool = *txpool.GetDefaultTxPoolConfig(nodeDir)
 	config.MainChainConfig.IsZeroFee = args.isZeroFee
 	config.MainChainConfig.IsPrivate = args.isPrivate
 
@@ -797,7 +797,7 @@ func displaySyncStatus(client *eth.EthClient) {
 
 // genTxsLoop generate & add a batch of transfer txs, repeat after delay flag.
 // Warning: Set txsDelay < 5 secs may build up old subroutines because previous subroutine to add txs won't be finished before new one starts.
-func genTxsLoop(numTxs int, txPool *tx_pool.TxPool) {
+func genTxsLoop(numTxs int, txPool *txpool.TxPool) {
 	genTool := tool.NewGeneratorTool()
 	time.Sleep(60 * time.Second)
 	genRound := 0
@@ -808,7 +808,7 @@ func genTxsLoop(numTxs int, txPool *tx_pool.TxPool) {
 	}
 }
 
-func genTxs(genTool *tool.GeneratorTool, numTxs int, txPool *tx_pool.TxPool, genRound int) {
+func genTxs(genTool *tool.GeneratorTool, numTxs int, txPool *txpool.TxPool, genRound int) {
 	goodCount := 0
 	badCount := 0
 	txList := genTool.GenerateRandomTxWithState(numTxs, txPool.State().StateDB)

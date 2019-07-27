@@ -23,13 +23,13 @@ import (
 	"github.com/kardiachain/go-kardia/dualchain/event_pool"
 	"github.com/kardiachain/go-kardia/dualnode/utils"
 	"github.com/kardiachain/go-kardia/kai/base"
+	"github.com/kardiachain/go-kardia/kai/events"
 	"github.com/kardiachain/go-kardia/lib/abi"
 	"github.com/kardiachain/go-kardia/lib/common"
 	"github.com/kardiachain/go-kardia/lib/event"
 	"github.com/kardiachain/go-kardia/lib/log"
-	"github.com/kardiachain/go-kardia/mainchain/tx_pool"
+	"github.com/kardiachain/go-kardia/mainchain/txpool"
 	"github.com/kardiachain/go-kardia/types"
-	"github.com/kardiachain/go-kardia/kai/events"
 )
 
 const ServiceName = "NEO"
@@ -39,12 +39,12 @@ const ServiceName = "NEO"
 type Proxy struct {
 
 	// name is name of proxy, or type that proxy connects to (eg: NEO, TRX, ETH)
-	name   string
+	name string
 
 	logger log.Logger // Logger for Tron service
 
 	kardiaBc   base.BaseBlockChain
-	txPool     *tx_pool.TxPool
+	txPool     *txpool.TxPool
 	smcAddress *common.Address
 	smcABI     *abi.ABI
 
@@ -60,14 +60,14 @@ type Proxy struct {
 	chainHeadSub event.Subscription
 
 	// Queue configuration
-	publishedEndpoint string
+	publishedEndpoint  string
 	subscribedEndpoint string
-	queueTopic string
+	queueTopic         string
 }
 
 func NewProxy(
 	kardiaBc base.BaseBlockChain,
-	txPool *tx_pool.TxPool,
+	txPool *txpool.TxPool,
 	dualBc base.BaseBlockChain,
 	dualEventPool *event_pool.EventPool,
 	publishedEndpoint string,
@@ -79,15 +79,15 @@ func NewProxy(
 	logger.AddTag(ServiceName)
 
 	processor := &Proxy{
-		name: configs.NEO,
-		logger: logger,
-		kardiaBc:   kardiaBc,
-		txPool:     txPool,
-		dualBc:     dualBc,
-		eventPool:  dualEventPool,
+		name:      configs.NEO,
+		logger:    logger,
+		kardiaBc:  kardiaBc,
+		txPool:    txPool,
+		dualBc:    dualBc,
+		eventPool: dualEventPool,
 
 		chainHeadCh: make(chan events.ChainHeadEvent, 5),
-		queueTopic: ServiceName,
+		queueTopic:  ServiceName,
 	}
 
 	processor.publishedEndpoint = publishedEndpoint
@@ -102,7 +102,6 @@ func NewProxy(
 
 	return processor, nil
 }
-
 
 // PublishedEndpoint returns publishedEndpoint
 func (p *Proxy) PublishedEndpoint() string {
@@ -139,7 +138,7 @@ func (p *Proxy) KardiaBlockChain() base.BaseBlockChain {
 }
 
 // KardiaTxPool returns Kardia Blockchain's tx pool
-func (p *Proxy) KardiaTxPool() *tx_pool.TxPool {
+func (p *Proxy) KardiaTxPool() *txpool.TxPool {
 	return p.txPool
 }
 

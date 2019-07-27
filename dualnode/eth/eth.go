@@ -53,14 +53,14 @@ import (
 	"github.com/kardiachain/go-kardia/lib/abi"
 	"github.com/kardiachain/go-kardia/lib/common"
 	"github.com/kardiachain/go-kardia/lib/log"
-	"github.com/kardiachain/go-kardia/mainchain/tx_pool"
+	"github.com/kardiachain/go-kardia/mainchain/txpool"
 	"github.com/kardiachain/go-kardia/types"
 )
 
 const (
 	// headChannelSize is the size of channel listening to ChainHeadEvent.
 	headChannelSize = 5
-	ServiceName = "ETH"
+	ServiceName     = "ETH"
 )
 
 // A full Ethereum node. In additional, it provides additional interface with dual's node,
@@ -88,7 +88,7 @@ type Eth struct {
 	kardiaChain base.BaseBlockChain
 	// TODO(namdoh,thientn): Deprecate this. This is needed solely submit remove amount Tx to
 	// Karida's tx pool.
-	txPool *tx_pool.TxPool
+	txPool *txpool.TxPool
 
 	// TODO(namdoh,thientn): Hard-coded for prototyping. This need to be passed dynamically.
 	smcABI        *abi.ABI
@@ -100,7 +100,7 @@ type Eth struct {
 }
 
 // Eth creates a Ethereum sub node.
-func NewEth(config *EthConfig, kardiaChain base.BaseBlockChain, txPool *tx_pool.TxPool, dualChain base.BaseBlockChain, dualEventPool *event_pool.EventPool, smcAddr *common.Address, smcABIStr string) (*Eth, error) {
+func NewEth(config *EthConfig, kardiaChain base.BaseBlockChain, txPool *txpool.TxPool, dualChain base.BaseBlockChain, dualEventPool *event_pool.EventPool, smcAddr *common.Address, smcABIStr string) (*Eth, error) {
 	smcABI, err := abi.JSON(strings.NewReader(smcABIStr))
 	if err != nil {
 		return nil, err
@@ -214,9 +214,9 @@ func NewEth(config *EthConfig, kardiaChain base.BaseBlockChain, txPool *tx_pool.
 
 	// TODO(namdoh@): Pass this dynamically from Kardia's state.
 	actionsTmp := [...]*types.DualAction{
-			&types.DualAction{
-				Name: dualnode.CreateKardiaMatchAmountTx,
-			},
+		&types.DualAction{
+			Name: dualnode.CreateKardiaMatchAmountTx,
+		},
 	}
 	kardiaSmcsTemp := [...]*types.KardiaSmartcontract{
 		&types.KardiaSmartcontract{
@@ -269,7 +269,7 @@ func (p *Eth) DualEventPool() *event_pool.EventPool {
 }
 
 // KardiaTxPool returns Kardia Blockchain's tx pool
-func (p *Eth) KardiaTxPool() *tx_pool.TxPool {
+func (p *Eth) KardiaTxPool() *txpool.TxPool {
 	return p.txPool
 }
 
@@ -323,7 +323,7 @@ func (n *Eth) SubmitTx(event *types.EventData) error {
 			arrAmounts := strings.Split(fields[configs.ExchangeV2ReleaseAmountsIndex], configs.ExchangeV2ReleaseValuesSepatator)
 			arrTxIds := strings.Split(fields[configs.ExchangeV2ReleaseTxIdsIndex], configs.ExchangeV2ReleaseValuesSepatator)
 			fromAmount, toAmount, err := utils.CallGetRate(fromType, toType, n.kardiaChain, statedb)
-			log.Info("Release","fromType", fromType, "toType", toType, "fromAmount", fromAmount, "toAmount", toAmount)
+			log.Info("Release", "fromType", fromType, "toType", toType, "fromAmount", fromAmount, "toAmount", toAmount)
 			if err != nil {
 				n.Logger().Error("error on getting rate", "fromType", fromType, "toType", toType, "err", err)
 				return err

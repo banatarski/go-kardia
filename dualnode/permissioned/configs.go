@@ -20,17 +20,18 @@ package permissioned
 
 import (
 	"fmt"
-	"github.com/kardiachain/go-kardia/node"
-	"github.com/kardiachain/go-kardia/lib/p2p/nat"
-	"github.com/kardiachain/go-kardia/lib/p2p"
-	"github.com/kardiachain/go-kardia/mainchain/genesis"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
+
 	"github.com/kardiachain/go-kardia/configs"
 	"github.com/kardiachain/go-kardia/dev"
-	"strings"
-	"strconv"
-	"path/filepath"
-	"github.com/kardiachain/go-kardia/mainchain/tx_pool"
-	"os"
+	"github.com/kardiachain/go-kardia/lib/p2p"
+	"github.com/kardiachain/go-kardia/lib/p2p/nat"
+	"github.com/kardiachain/go-kardia/mainchain/genesis"
+	"github.com/kardiachain/go-kardia/mainchain/txpool"
+	"github.com/kardiachain/go-kardia/node"
 )
 
 const (
@@ -43,22 +44,22 @@ const (
 )
 
 type Config struct {
-	Proposal                 int
-	Name                     *string
-	NetworkId                *uint64
-	DataDir                  *string
-	HTTPPort                 *int
-	HTTPModules              []string
-	HTTPVirtualHosts         []string
-	HTTPCors                 []string
-	ListenAddr               *string
-	ChainDataDir             *string
-	DbCache                  *int
-	DbHandles                *int
-	ValidatorsIndices        *string
-	ServiceName              *string
-	ChainID                  *uint64
-	ClearData                bool
+	Proposal          int
+	Name              *string
+	NetworkId         *uint64
+	DataDir           *string
+	HTTPPort          *int
+	HTTPModules       []string
+	HTTPVirtualHosts  []string
+	HTTPCors          []string
+	ListenAddr        *string
+	ChainDataDir      *string
+	DbCache           *int
+	DbHandles         *int
+	ValidatorsIndices *string
+	ServiceName       *string
+	ChainID           *uint64
+	ClearData         bool
 }
 
 var DefaultConfig = node.NodeConfig{
@@ -81,7 +82,7 @@ var DefaultConfig = node.NodeConfig{
 		IsPrivate:    true,
 		IsZeroFee:    true,
 		Genesis:      genesis.DefaulTestnetFullGenesisBlock(configs.GenesisAccounts, configs.GenesisContracts),
-		EnvConfig: node.NewEnvironmentConfig(),
+		EnvConfig:    node.NewEnvironmentConfig(),
 	},
 }
 
@@ -155,8 +156,8 @@ func SetUp(config *Config) (nodeConfig *node.NodeConfig, err error) {
 		return nil, fmt.Errorf("list of validators indices must not be empty")
 	}
 	nodeConfig.MainChainConfig.ValidatorIndexes, err = getIntArray(*config.ValidatorsIndices)
-	nodeConfig.MainChainConfig.TxPool = *tx_pool.GetDefaultTxPoolConfig(nodeDir)
-	nodeConfig.MainChainConfig.EnvConfig.SetProposerIndex(config.Proposal - 1, len(dev.Nodes))
+	nodeConfig.MainChainConfig.TxPool = *txpool.GetDefaultTxPoolConfig(nodeDir)
+	nodeConfig.MainChainConfig.EnvConfig.SetProposerIndex(config.Proposal-1, len(dev.Nodes))
 	return nodeConfig, nil
 }
 

@@ -16,11 +16,12 @@
  *  along with the go-kardia library. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package tx_pool
+package txpool
 
 import (
 	"container/heap"
 	"errors"
+	"fmt"
 	"io"
 	"math"
 	"math/big"
@@ -28,6 +29,8 @@ import (
 	"runtime"
 	"sort"
 
+	"github.com/kardiachain/go-kardia/configs"
+	"github.com/kardiachain/go-kardia/kvm"
 	"github.com/kardiachain/go-kardia/lib/common"
 	"github.com/kardiachain/go-kardia/lib/log"
 	"github.com/kardiachain/go-kardia/lib/rlp"

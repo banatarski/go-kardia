@@ -19,8 +19,8 @@
 package kai
 
 import (
-	"github.com/kardiachain/go-kardia/mainchain/tx_pool"
 	"github.com/kardiachain/go-kardia/mainchain/genesis"
+	"github.com/kardiachain/go-kardia/mainchain/txpool"
 )
 
 // DefaultConfig contains default settings for use on the Kardia main net.
@@ -28,7 +28,7 @@ var DefaultConfig = Config{
 
 	NetworkId: 1,
 
-	TxPool: tx_pool.DefaultTxPoolConfig,
+	TxPool: txpool.DefaultTxPoolConfig,
 }
 
 //go:generate gencodec -type Config -field-override configMarshaling -formats toml -out gen_config.go
@@ -44,7 +44,7 @@ type Config struct {
 	Genesis *genesis.Genesis `toml:",omitempty"`
 
 	// Transaction pool options
-	TxPool tx_pool.TxPoolConfig
+	TxPool txpool.TxPoolConfig
 
 	// chaindata
 	ChainData string

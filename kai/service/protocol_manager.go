@@ -26,16 +26,16 @@ import (
 
 	"github.com/kardiachain/go-kardia/configs"
 	"github.com/kardiachain/go-kardia/consensus"
+	"github.com/kardiachain/go-kardia/kai/base"
+	"github.com/kardiachain/go-kardia/kai/events"
 	serviceconst "github.com/kardiachain/go-kardia/kai/service/const"
 	"github.com/kardiachain/go-kardia/lib/common"
 	"github.com/kardiachain/go-kardia/lib/event"
 	"github.com/kardiachain/go-kardia/lib/log"
 	"github.com/kardiachain/go-kardia/lib/p2p"
 	"github.com/kardiachain/go-kardia/lib/p2p/discover"
+	"github.com/kardiachain/go-kardia/mainchain/txpool"
 	"github.com/kardiachain/go-kardia/types"
-	"github.com/kardiachain/go-kardia/kai/base"
-	"github.com/kardiachain/go-kardia/mainchain/tx_pool"
-	"github.com/kardiachain/go-kardia/kai/events"
 )
 
 const (
@@ -70,7 +70,7 @@ type ProtocolManager struct {
 
 	peers *peerSet
 
-	txpool *tx_pool.TxPool
+	txpool *txpool.TxPool
 
 	blockchain  base.BaseBlockChain
 	chainconfig *configs.ChainConfig
@@ -104,7 +104,7 @@ func NewProtocolManager(
 	chainID uint64,
 	blockchain base.BaseBlockChain,
 	config *configs.ChainConfig,
-	txpool *tx_pool.TxPool,
+	txpool *txpool.TxPool,
 	csReactor *consensus.ConsensusManager) (*ProtocolManager, error) {
 
 	// Create the protocol manager with the base fields
@@ -246,9 +246,9 @@ func (pm *ProtocolManager) handle(p *peer) error {
 	pm.logger.Debug("Kardia peer connected", "name", p.Name())
 
 	var (
-		genesis = pm.blockchain.Genesis()
-		hash    = pm.blockchain.CurrentHeader().Hash()
-		height  = pm.blockchain.CurrentBlock().Height()
+		genesis       = pm.blockchain.Genesis()
+		hash          = pm.blockchain.CurrentHeader().Hash()
+		height        = pm.blockchain.CurrentBlock().Height()
 		hasPermission = pm.blockchain.HasPermission(p.Peer)
 	)
 

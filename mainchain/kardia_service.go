@@ -30,15 +30,15 @@ import (
 	"github.com/kardiachain/go-kardia/lib/log"
 	"github.com/kardiachain/go-kardia/lib/p2p"
 	"github.com/kardiachain/go-kardia/mainchain/blockchain"
+	"github.com/kardiachain/go-kardia/mainchain/genesis"
+	"github.com/kardiachain/go-kardia/mainchain/txpool"
 	"github.com/kardiachain/go-kardia/node"
 	"github.com/kardiachain/go-kardia/rpc"
 	"github.com/kardiachain/go-kardia/types"
-	"github.com/kardiachain/go-kardia/mainchain/tx_pool"
-	"github.com/kardiachain/go-kardia/mainchain/genesis"
 )
 
 const (
-	kaiProtocolName   = "KAI"
+	kaiProtocolName = "KAI"
 )
 
 // TODO: evaluates using this subservice as dual mode or light subprotocol.
@@ -63,7 +63,7 @@ type KardiaService struct {
 	kaiDb storage.Database // Local key-value store endpoint. Each use types should use wrapper layer with unique prefixes.
 
 	// Handlers
-	txPool          *tx_pool.TxPool
+	txPool          *txpool.TxPool
 	protocolManager *service.ProtocolManager
 	blockchain      *blockchain.BlockChain
 	csManager       *consensus.ConsensusManager
@@ -116,7 +116,7 @@ func newKardiaService(ctx *node.ServiceContext, config *Config) (*KardiaService,
 
 	// Set zeroFee to blockchain
 	kai.blockchain.IsZeroFee = config.IsZeroFee
-	kai.txPool = tx_pool.NewTxPool(logger, config.TxPool, kai.chainConfig, kai.blockchain)
+	kai.txPool = txpool.NewTxPool(logger, config.TxPool, kai.chainConfig, kai.blockchain)
 
 	// Initialization for consensus.
 	block := kai.blockchain.CurrentBlock()
@@ -263,7 +263,7 @@ func (s *KardiaService) APIs() []rpc.API {
 	}
 }
 
-func (s *KardiaService) TxPool() *tx_pool.TxPool         { return s.txPool }
+func (s *KardiaService) TxPool() *txpool.TxPool             { return s.txPool }
 func (s *KardiaService) BlockChain() *blockchain.BlockChain { return s.blockchain }
 func (s *KardiaService) ChainConfig() *configs.ChainConfig  { return s.chainConfig }
-func (s *KardiaService) DB() storage.Database { return s.kaiDb }
+func (s *KardiaService) DB() storage.Database               { return s.kaiDb }

@@ -20,6 +20,10 @@ package permissioned
 
 import (
 	"fmt"
+	"math/big"
+	"strconv"
+	"strings"
+
 	"github.com/kardiachain/go-kardia/configs"
 	"github.com/kardiachain/go-kardia/dualchain/event_pool"
 	"github.com/kardiachain/go-kardia/dualnode/utils"
@@ -29,15 +33,12 @@ import (
 	"github.com/kardiachain/go-kardia/lib/common"
 	"github.com/kardiachain/go-kardia/lib/event"
 	"github.com/kardiachain/go-kardia/lib/log"
-	"github.com/kardiachain/go-kardia/mainchain"
+	kai "github.com/kardiachain/go-kardia/mainchain"
 	"github.com/kardiachain/go-kardia/mainchain/permissioned"
-	"github.com/kardiachain/go-kardia/mainchain/tx_pool"
+	"github.com/kardiachain/go-kardia/mainchain/txpool"
 	"github.com/kardiachain/go-kardia/node"
 	"github.com/kardiachain/go-kardia/types"
 	"github.com/pkg/errors"
-	"math/big"
-	"strconv"
-	"strings"
 )
 
 const SERVICE_NAME = "PRIVATE_DUAL"
@@ -76,7 +77,7 @@ type PermissionedProxy struct {
 	name string
 
 	permissionBc base.BaseBlockChain
-	txPool       *tx_pool.TxPool
+	txPool       *txpool.TxPool
 	// TODO: uncomment these lines when we have specific watched smartcontract
 	smcAddress *common.Address
 	smcABI     *abi.ABI
@@ -101,7 +102,7 @@ type PermissionedProxy struct {
 
 // NewPermissionedProxy initiates a new private proxy
 func NewPermissionedProxy(config *Config, internalBlockchain base.BaseBlockChain,
-	txPool *tx_pool.TxPool, dualBc base.BaseBlockChain, eventPool *event_pool.EventPool,
+	txPool *txpool.TxPool, dualBc base.BaseBlockChain, eventPool *event_pool.EventPool,
 	address *common.Address, smcABIStr string) (*PermissionedProxy, error) {
 
 	logger := log.New()
@@ -192,7 +193,7 @@ func (p *PermissionedProxy) DualEventPool() *event_pool.EventPool {
 }
 
 // KardiaTxPool returns Kardia Blockchain's tx pool
-func (p *PermissionedProxy) KardiaTxPool() *tx_pool.TxPool {
+func (p *PermissionedProxy) KardiaTxPool() *txpool.TxPool {
 	return p.txPool
 }
 
@@ -376,7 +377,7 @@ func (p *PermissionedProxy) ComputeTxMetadata(event *types.EventData) (*types.Tx
 	return nil, nil
 }
 
-func (p *PermissionedProxy) createTxFromKardiaForwardedRequest(event *types.EventData, pool *tx_pool.TxPool) (*types.Transaction, error) {
+func (p *PermissionedProxy) createTxFromKardiaForwardedRequest(event *types.EventData, pool *txpool.TxPool) (*types.Transaction, error) {
 	if event.Data.TxMethod != configs.KardiaForwardRequestFunction {
 		return nil, configs.ErrUnsupportedMethod
 	}
@@ -412,7 +413,7 @@ func (p *PermissionedProxy) createTxFromKardiaForwardedRequest(event *types.Even
 
 // createTxFromKardiaForwardedResponse returns tx to call to private chain candidate smart contract to respond to a
 // candidate info request
-func (p *PermissionedProxy) createTxFromKardiaForwardedResponse(event *types.EventData, pool *tx_pool.TxPool) (*types.Transaction, error) {
+func (p *PermissionedProxy) createTxFromKardiaForwardedResponse(event *types.EventData, pool *txpool.TxPool) (*types.Transaction, error) {
 	if event.Data.TxMethod != configs.KardiaForwardResponseFunction {
 		return nil, configs.ErrUnsupportedMethod
 	}

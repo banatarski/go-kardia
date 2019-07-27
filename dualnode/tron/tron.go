@@ -19,27 +19,28 @@
 package tron
 
 import (
-	"github.com/kardiachain/go-kardia/kai/base"
-	"github.com/kardiachain/go-kardia/mainchain/tx_pool"
-	"github.com/kardiachain/go-kardia/dualchain/event_pool"
-	"github.com/kardiachain/go-kardia/lib/event"
-	"github.com/kardiachain/go-kardia/types"
 	"github.com/kardiachain/go-kardia/configs"
-	"github.com/kardiachain/go-kardia/lib/log"
+	"github.com/kardiachain/go-kardia/dualchain/event_pool"
 	"github.com/kardiachain/go-kardia/dualnode/utils"
+	"github.com/kardiachain/go-kardia/kai/base"
 	"github.com/kardiachain/go-kardia/kai/events"
+	"github.com/kardiachain/go-kardia/lib/event"
+	"github.com/kardiachain/go-kardia/lib/log"
+	"github.com/kardiachain/go-kardia/mainchain/txpool"
+	"github.com/kardiachain/go-kardia/types"
 )
 
 const ServiceName = "TRX"
+
 type Proxy struct {
 
 	// name is name of proxy, or type that proxy connects to (eg: NEO, TRX, ETH, KARDIA)
-	name   string
+	name string
 
 	logger log.Logger // Logger for Tron service
 
-	kardiaBc   base.BaseBlockChain
-	txPool     *tx_pool.TxPool
+	kardiaBc base.BaseBlockChain
+	txPool   *txpool.TxPool
 
 	// Dual blockchain related fields
 	dualBc    base.BaseBlockChain
@@ -53,7 +54,7 @@ type Proxy struct {
 	chainHeadSub event.Subscription
 
 	// Queue configuration
-	publishedEndpoint string
+	publishedEndpoint  string
 	subscribedEndpoint string
 }
 
@@ -92,7 +93,7 @@ func (p *Proxy) KardiaBlockChain() base.BaseBlockChain {
 }
 
 // KardiaTxPool returns Kardia Blockchain's tx pool
-func (p *Proxy) KardiaTxPool() *tx_pool.TxPool {
+func (p *Proxy) KardiaTxPool() *txpool.TxPool {
 	return p.txPool
 }
 
@@ -105,25 +106,25 @@ func (p *Proxy) Name() string {
 }
 
 func NewProxy(
-		kardiaBc base.BaseBlockChain,
-		txPool *tx_pool.TxPool,
-		dualBc base.BaseBlockChain,
-		dualEventPool *event_pool.EventPool,
-		publishedEndpoint string,
-		subscribedEndpoint string,
-	) (*Proxy, error) {
+	kardiaBc base.BaseBlockChain,
+	txPool *txpool.TxPool,
+	dualBc base.BaseBlockChain,
+	dualEventPool *event_pool.EventPool,
+	publishedEndpoint string,
+	subscribedEndpoint string,
+) (*Proxy, error) {
 
 	// Create a specific logger for DUAL service.
 	logger := log.New()
 	logger.AddTag(ServiceName)
 
 	processor := &Proxy{
-		name:       configs.TRON,
-		logger:     logger,
-		kardiaBc:   kardiaBc,
-		txPool:     txPool,
-		dualBc:     dualBc,
-		eventPool:  dualEventPool,
+		name:        configs.TRON,
+		logger:      logger,
+		kardiaBc:    kardiaBc,
+		txPool:      txPool,
+		dualBc:      dualBc,
+		eventPool:   dualEventPool,
 		chainHeadCh: make(chan events.ChainHeadEvent, 5),
 	}
 

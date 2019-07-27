@@ -27,16 +27,17 @@ import (
 	"github.com/kardiachain/go-kardia/dualchain/event_pool"
 	"github.com/kardiachain/go-kardia/dualnode/utils"
 	"github.com/kardiachain/go-kardia/kai/base"
+	"github.com/kardiachain/go-kardia/kai/events"
 	"github.com/kardiachain/go-kardia/lib/abi"
 	"github.com/kardiachain/go-kardia/lib/common"
 	"github.com/kardiachain/go-kardia/lib/event"
 	"github.com/kardiachain/go-kardia/lib/log"
-	"github.com/kardiachain/go-kardia/mainchain/tx_pool"
+	"github.com/kardiachain/go-kardia/mainchain/txpool"
 	"github.com/kardiachain/go-kardia/types"
-	"github.com/kardiachain/go-kardia/kai/events"
 )
 
 const PRIVATE_KARDIA = "PRIVATE"
+
 var ErrInsufficientCandidateRequestData = errors.New("insufficient candidate request data")
 var ErrInsufficientCandidateResponseData = errors.New("insufficient candidate response data")
 var ErrUnpackForwardRequestInfo = errors.New("error unpacking info forward request input")
@@ -65,7 +66,7 @@ type PrivateKardiaProxy struct {
 
 	// Kardia's mainchain stuffs.
 	kardiaBc     base.BaseBlockChain
-	txPool       *tx_pool.TxPool
+	txPool       *txpool.TxPool
 	chainHeadCh  chan events.ChainHeadEvent // Used to subscribe for new blocks.
 	chainHeadSub event.Subscription
 
@@ -106,7 +107,7 @@ func (p *PrivateKardiaProxy) DualEventPool() *event_pool.EventPool {
 }
 
 // KardiaTxPool returns Kardia Blockchain's tx pool
-func (p *PrivateKardiaProxy) KardiaTxPool() *tx_pool.TxPool {
+func (p *PrivateKardiaProxy) KardiaTxPool() *txpool.TxPool {
 	return p.txPool
 }
 
@@ -128,7 +129,7 @@ func (p *PrivateKardiaProxy) Name() string {
 	return p.name
 }
 
-func NewPrivateKardiaProxy(kardiaBc base.BaseBlockChain, txPool *tx_pool.TxPool, dualBc base.BaseBlockChain, dualEventPool *event_pool.EventPool, smcAddr *common.Address, smcABIStr string) (*PrivateKardiaProxy, error) {
+func NewPrivateKardiaProxy(kardiaBc base.BaseBlockChain, txPool *txpool.TxPool, dualBc base.BaseBlockChain, dualEventPool *event_pool.EventPool, smcAddr *common.Address, smcABIStr string) (*PrivateKardiaProxy, error) {
 	var err error
 	smcABI, err := abi.JSON(strings.NewReader(smcABIStr))
 	if err != nil {

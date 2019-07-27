@@ -41,7 +41,7 @@ import (
 	"github.com/kardiachain/go-kardia/lib/p2p"
 	"github.com/kardiachain/go-kardia/mainchain/genesis"
 	"github.com/kardiachain/go-kardia/mainchain/permissioned"
-	"github.com/kardiachain/go-kardia/mainchain/tx_pool"
+	"github.com/kardiachain/go-kardia/mainchain/txpool"
 	"github.com/kardiachain/go-kardia/types"
 )
 
@@ -69,7 +69,7 @@ type MainChainConfig struct {
 	Genesis *genesis.Genesis
 
 	// Transaction pool options
-	TxPool tx_pool.TxPoolConfig
+	TxPool txpool.TxPoolConfig
 
 	// AcceptTxs accept tx sync process or not (1 is yes and 0 is no)
 	AcceptTxs uint32
