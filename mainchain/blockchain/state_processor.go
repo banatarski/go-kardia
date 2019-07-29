@@ -19,8 +19,6 @@
 package blockchain
 
 import (
-	"errors"
-
 	"github.com/kardiachain/go-kardia/kai/state"
 	"github.com/kardiachain/go-kardia/kvm"
 	"github.com/kardiachain/go-kardia/lib/crypto"
@@ -113,7 +111,3 @@ func ApplyTransaction(logger log.Logger, bc vm.ChainContext, gp *GasPool, stated
 
 	return receipt, gas, err
 }
-
-var (
-	ErrInsufficientBalanceForGas = errors.New("insufficient balance to pay for gas")
-)

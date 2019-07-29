@@ -74,6 +74,10 @@ var (
 	// than required to start the invocation.
 	ErrIntrinsicGas = errors.New("intrinsic gas too low")
 
+	// ErrInsufficientBalanceForGas is returned if the account balance insufficient to
+	// pay for gas
+	ErrInsufficientBalanceForGas = errors.New("insufficient balance to pay for gas")
+
 	// ErrGasLimit is returned if a transaction's requested gas limit exceeds the
 	// maximum allowance of the current block.
 	ErrGasLimit = errors.New("exceeds block gas limit")
