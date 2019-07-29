@@ -94,7 +94,7 @@ var (
 
 var (
 	evictionInterval    = time.Minute     // Time interval to check for evictable transactions
-	statsReportInterval = 8 * time.Second // Time interval to report transaction pool stats
+	statsReportInterval = 10 * time.Second // Time interval to report transaction pool stats
 )
 
 var (
@@ -164,7 +164,7 @@ var DefaultTxPoolConfig = TxPoolConfig{
 	AccountQueue: 64,
 	GlobalQueue:  1024,
 
-	Lifetime: 3 * time.Hour,
+	Lifetime: 1 * time.Hour,
 }
 
 // GetDefaultTxPoolConfig returns default txPoolConfig with given dir path

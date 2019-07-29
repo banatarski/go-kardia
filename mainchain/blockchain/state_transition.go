@@ -143,9 +143,9 @@ func (st *StateTransition) preCheck() error {
 // returning the result including the the used gas. It returns an error if it
 // failed. An error indicates a consensus issue.
 func (st *StateTransition) TransitionDb() (ret []byte, usedGas uint64, failed bool, err error) {
-	// if err = st.preCheck(); err != nil {
-	// 	return
-	// }
+	if err = st.preCheck(); err != nil {
+		return
+	}
 	msg := st.msg
 	sender := kvm.AccountRef(msg.From())
 	contractCreation := msg.To() == nil
