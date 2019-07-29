@@ -22,7 +22,7 @@ import (
 	"math"
 	"math/big"
 
-	"github.com/kardiachain/go-kardia/configs"
+	"github.com/kardiachain/go-kardia/dualnode/utils/tx_util"
 	"github.com/kardiachain/go-kardia/kvm"
 	"github.com/kardiachain/go-kardia/lib/common"
 	"github.com/kardiachain/go-kardia/lib/log"
@@ -68,39 +68,6 @@ type Message interface {
 	Nonce() uint64
 	CheckNonce() bool
 	Data() []byte
-}
-
-// IntrinsicGas computes the 'intrinsic gas' for a message with the given data.
-func IntrinsicGas(data []byte, contractCreation bool) (uint64, error) {
-	// Set the starting gas for the raw transaction
-	var gas uint64
-	if contractCreation {
-		gas = configs.TxGasContractCreation
-	} else {
-		gas = configs.TxGas
-	}
-	// Bump the required gas by the amount of transactional data
-	if len(data) > 0 {
-		// Zero and non-zero bytes are priced differently
-		var nz uint64
-		for _, byt := range data {
-			if byt != 0 {
-				nz++
-			}
-		}
-		// Make sure we don't exceed uint64 for all data combinations
-		if (math.MaxUint64-gas)/configs.TxDataNonZeroGas < nz {
-			return 0, kvm.ErrOutOfGas
-		}
-		gas += nz * configs.TxDataNonZeroGas
-
-		z := uint64(len(data)) - nz
-		if (math.MaxUint64-gas)/configs.TxDataZeroGas < z {
-			return 0, kvm.ErrOutOfGas
-		}
-		gas += z * configs.TxDataZeroGas
-	}
-	return gas, nil
 }
 
 // NewStateTransition initialises and returns a new state transition object.
@@ -185,7 +152,7 @@ func (st *StateTransition) TransitionDb() (ret []byte, usedGas uint64, failed bo
 	contractCreation := msg.To() == nil
 
 	// Pay intrinsic gas
-	gas, err := IntrinsicGas(st.data, contractCreation)
+	gas, err := tx_util.IntrinsicGas(st.data, contractCreation)
 	if err != nil {
 		return nil, 0, false, err
 	}
