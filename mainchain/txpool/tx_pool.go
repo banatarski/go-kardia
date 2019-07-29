@@ -610,13 +610,15 @@ func (pool *TxPool) validateTx(tx *types.Transaction, local bool) error {
 		return ErrInsufficientFunds
 	}
 
-	// intrGas, err := IntrinsicGas(tx.Data(), tx.To() == nil)
+	intrGas, err := IntrinsicGas(tx.Data(), tx.To() == nil)
+
 	if err != nil {
 		return err
 	}
-	// if tx.Gas() < intrGas {
-	// 	return ErrIntrinsicGas
-	// }
+
+	if tx.Gas() < intrGas {
+		return ErrIntrinsicGas
+	}
 
 	return nil
 }
