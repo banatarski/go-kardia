@@ -153,7 +153,8 @@ func (bo *BlockOperations) SaveBlock(block *types.Block, seenCommit *types.Commi
 	bo.blockchain.WriteCommit(height, seenCommit)
 
 	// TODO(thientn/kiendn): Evaluates remove txs directly here, or depending on txPool.reset() when receiving new block event.
-	bo.txPool.RemoveTxs(block.Transactions())
+	// DONE(luutd): Remove this cause we alrealy rm txs while sorting txs in txpool
+	//bo.txPool.RemoveTxs(block.Transactions())
 
 	bo.mtx.Lock()
 	bo.height = height
