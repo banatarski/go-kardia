@@ -28,7 +28,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ethereum/go-ethereum/metrics"
 	"gopkg.in/karalabe/cookiejar.v2/collections/prque"
 
 	"github.com/kardiachain/go-kardia/configs"
@@ -37,6 +36,7 @@ import (
 	"github.com/kardiachain/go-kardia/lib/common"
 	"github.com/kardiachain/go-kardia/lib/event"
 	"github.com/kardiachain/go-kardia/lib/log"
+	"github.com/kardiachain/go-kardia/lib/metrics"
 	"github.com/kardiachain/go-kardia/mainchain/utils"
 	"github.com/kardiachain/go-kardia/types"
 )
