@@ -133,7 +133,7 @@ func (st *StateTransition) preCheck() error {
 		if nonce < st.msg.Nonce() {
 			return txpool.ErrNonceTooHigh
 		} else if nonce > st.msg.Nonce() {
-			return txpool.ErrNonceTooHigh
+			return txpool.ErrNonceTooLow
 		}
 	}
 	return st.buyGas()
