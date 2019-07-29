@@ -32,12 +32,12 @@ import (
 	"gopkg.in/karalabe/cookiejar.v2/collections/prque"
 
 	"github.com/kardiachain/go-kardia/configs"
-	"github.com/kardiachain/go-kardia/dualnode/utils/tx_util"
 	"github.com/kardiachain/go-kardia/kai/events"
 	"github.com/kardiachain/go-kardia/kai/state"
 	"github.com/kardiachain/go-kardia/lib/common"
 	"github.com/kardiachain/go-kardia/lib/event"
 	"github.com/kardiachain/go-kardia/lib/log"
+	"github.com/kardiachain/go-kardia/mainchain/utils"
 	"github.com/kardiachain/go-kardia/types"
 )
 
@@ -611,7 +611,7 @@ func (pool *TxPool) validateTx(tx *types.Transaction, local bool) error {
 		return ErrInsufficientFunds
 	}
 
-	intrGas, err := tx_util.IntrinsicGas(tx.Data(), tx.To() == nil)
+	intrGas, err := utils.IntrinsicGas(tx.Data(), tx.To() == nil)
 
 	if err != nil {
 		return err

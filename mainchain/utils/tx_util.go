@@ -16,12 +16,13 @@
  *  along with the go-kardia library. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package tx_util
+package utils
 
 import (
+	"math"
+
 	"github.com/kardiachain/go-kardia/configs"
 	"github.com/kardiachain/go-kardia/kvm"
-	"math"
 )
 
 // IntrinsicGas computes the 'intrinsic gas' for a message with the given data.

@@ -16,3 +16,6 @@
 
 #dep
 vendor/
+
+# lightnode in development
+lightnode

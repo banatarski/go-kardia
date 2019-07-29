@@ -22,11 +22,11 @@ import (
 	"math"
 	"math/big"
 
-	"github.com/kardiachain/go-kardia/dualnode/utils/tx_util"
 	"github.com/kardiachain/go-kardia/kvm"
 	"github.com/kardiachain/go-kardia/lib/common"
 	"github.com/kardiachain/go-kardia/lib/log"
 	"github.com/kardiachain/go-kardia/mainchain/txpool"
+	"github.com/kardiachain/go-kardia/mainchain/utils"
 )
 
 /*
@@ -152,7 +152,7 @@ func (st *StateTransition) TransitionDb() (ret []byte, usedGas uint64, failed bo
 	contractCreation := msg.To() == nil
 
 	// Pay intrinsic gas
-	gas, err := tx_util.IntrinsicGas(st.data, contractCreation)
+	gas, err := utils.IntrinsicGas(st.data, contractCreation)
 	if err != nil {
 		return nil, 0, false, err
 	}

@@ -20,18 +20,12 @@ package blockchain
 
 import (
 	"errors"
-	"fmt"
-	"math"
-	"math/big"
 
-	"github.com/kardiachain/go-kardia/configs"
 	"github.com/kardiachain/go-kardia/kai/state"
 	"github.com/kardiachain/go-kardia/kvm"
-	"github.com/kardiachain/go-kardia/lib/common"
 	"github.com/kardiachain/go-kardia/lib/crypto"
 	"github.com/kardiachain/go-kardia/lib/log"
 	vm "github.com/kardiachain/go-kardia/mainchain/kvm"
-	"github.com/kardiachain/go-kardia/mainchain/txpool"
 	"github.com/kardiachain/go-kardia/types"
 )
 
