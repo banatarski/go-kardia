@@ -93,7 +93,7 @@ var (
 )
 
 var (
-	evictionInterval    = time.Minute     // Time interval to check for evictable transactions
+	evictionInterval    = time.Minute      // Time interval to check for evictable transactions
 	statsReportInterval = 10 * time.Second // Time interval to report transaction pool stats
 )
 

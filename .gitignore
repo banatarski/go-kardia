@@ -17,5 +17,6 @@
 #dep
 vendor/
 
-# lightnode in development
+# Development mode
 lightnode
+go-kardia
