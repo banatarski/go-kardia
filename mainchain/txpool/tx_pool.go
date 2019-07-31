@@ -999,7 +999,7 @@ func (pool *TxPool) scheduleReorgLoop() {
 }
 
 // runReorg runs reset and promoteExecutables on behalf of scheduleReorgLoop.
-func (pool *TxPool) runReorg(done chan struct{}, reset *txpoolResetRequest, dirtyAccounts *accountSet, events map[common.Address]*txSortedMap) {
+func (pool *TxPool) runReorg(done chan struct{}, reset *txpoolResetRequest, dirtyAccounts *accountSet, eventsMap map[common.Address]*txSortedMap) {
 	defer close(done)
 
 	var promoteAddrs []common.Address
@@ -1011,11 +1011,11 @@ func (pool *TxPool) runReorg(done chan struct{}, reset *txpoolResetRequest, dirt
 		// Reset from the old head to the new, rescheduling any reorged transactions
 		pool.reset(reset.oldHead, reset.newHead)
 
-		// Nonces were reset, discard any events that became stale
-		for addr := range events {
-			events[addr].Forward(pool.pendingNonces.get(addr))
-			if events[addr].Len() == 0 {
-				delete(events, addr)
+		// Nonces were reset, discard any eventsMap that became stale
+		for addr := range eventsMap {
+			eventsMap[addr].Forward(pool.pendingNonces.get(addr))
+			if eventsMap[addr].Len() == 0 {
+				delete(eventsMap, addr)
 			}
 		}
 		// Reset needs promote for all addresses
@@ -1028,10 +1028,10 @@ func (pool *TxPool) runReorg(done chan struct{}, reset *txpoolResetRequest, dirt
 	promoted := pool.promoteExecutables(promoteAddrs)
 	for _, tx := range promoted {
 		addr, _ := types.Sender(tx)
-		if _, ok := events[addr]; !ok {
-			events[addr] = newTxSortedMap()
+		if _, ok := eventsMap[addr]; !ok {
+			eventsMap[addr] = newTxSortedMap()
 		}
-		events[addr].Put(tx)
+		eventsMap[addr].Put(tx)
 	}
 	// If a new block appeared, validate the pool of pending transactions. This will
 	// remove any transaction that has been included in the block or was invalidated
@@ -1051,9 +1051,9 @@ func (pool *TxPool) runReorg(done chan struct{}, reset *txpoolResetRequest, dirt
 	pool.mu.Unlock()
 
 	// Notify subsystems for newly added transactions
-	if len(events) > 0 {
+	if len(eventsMap) > 0 {
 		var txs []*types.Transaction
-		for _, set := range events {
+		for _, set := range eventsMap {
 			txs = append(txs, set.Flatten()...)
 		}
 		pool.txFeed.Send(events.NewTxsEvent{txs})
@@ -1388,6 +1388,10 @@ func (pool *TxPool) demoteUnexecutables() {
 			delete(pool.beats, addr)
 		}
 	}
+}
+
+func (pool *TxPool) State() *state.ManagedState {
+	return state.ManageState(pool.currentState)
 }
 
 // addressByHeartbeat is an account address tagged with its last activity timestamp.
