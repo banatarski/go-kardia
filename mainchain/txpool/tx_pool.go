@@ -42,7 +42,7 @@ import (
 
 const (
 	// chainHeadChanSize is the size of channel listening to ChainHeadEvent.
-	chainHeadChanSize = 16
+	chainHeadChanSize = 10
 )
 
 var (
@@ -499,14 +499,6 @@ func (pool *TxPool) Pending() (map[common.Address]types.Transactions, error) {
 		pending[addr] = list.Flatten()
 	}
 	return pending, nil
-}
-
-// Locals retrieves the accounts currently considered local by the pool.
-func (pool *TxPool) Locals() []common.Address {
-	pool.mu.Lock()
-	defer pool.mu.Unlock()
-
-	return pool.locals.flatten()
 }
 
 // local retrieves all currently known local transactions, grouped by origin
