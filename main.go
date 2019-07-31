@@ -799,7 +799,7 @@ func displaySyncStatus(client *eth.EthClient) {
 // Warning: Set txsDelay < 5 secs may build up old subroutines because previous subroutine to add txs won't be finished before new one starts.
 func genTxsLoop(numTxs int, txPool *txpool.TxPool) {
 	genTool := tool.NewGeneratorTool()
-	time.Sleep(60 * time.Second)
+	time.Sleep(30 * time.Second)
 	genRound := 0
 	for {
 		go genTxs(genTool, numTxs, txPool, genRound)

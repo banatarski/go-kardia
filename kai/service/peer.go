@@ -48,7 +48,7 @@ const (
 	// maxQueuedTxs is the maximum number of transaction lists to queue up before
 	// dropping broadcasts. This is a sensitive number as a transaction list might
 	// contain a single transaction, or thousands.
-	maxQueuedTxs = 128
+	maxQueuedTxs = 1024
 )
 
 // PeerInfo represents a short summary of the Kai sub-protocol metadata known

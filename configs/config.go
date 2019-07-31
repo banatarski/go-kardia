@@ -23,9 +23,10 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/kardiachain/go-kardia/lib/common"
 	"math"
 	"strings"
+
+	"github.com/kardiachain/go-kardia/lib/common"
 )
 
 // TODO(huny): Get the proper genesis hash for Kardia when ready
@@ -36,9 +37,9 @@ var (
 )
 
 var (
-	DefaultChainID = uint64(1)
-	EthDualChainID = uint64(2)
-	NeoDualChainID = uint64(3)
+	DefaultChainID  = uint64(1)
+	EthDualChainID  = uint64(2)
+	NeoDualChainID  = uint64(3)
 	TronDualChainID = uint64(4)
 )
 
@@ -188,8 +189,8 @@ func DefaultConsensusConfig() *ConsensusConfig {
 		SkipTimeoutCommit:           false,
 		CreateEmptyBlocks:           true,
 		CreateEmptyBlocksInterval:   0,
-		PeerGossipSleepDuration:     3000,
-		PeerQueryMaj23SleepDuration: 2000,
+		PeerGossipSleepDuration:     500,
+		PeerQueryMaj23SleepDuration: 500,
 	}
 }
 
@@ -226,8 +227,7 @@ func (cfg *ConsensusConfig) PeerQueryMaj23Sleep() time.Duration {
 // ======================= Genesis Const =======================
 
 var InitValue = big.NewInt(int64(math.Pow10(10))) // Update Genesis Account Values
-var InitValueInCell = InitValue.Mul(InitValue, big.NewInt(int64(math.Pow10(18)))) 
-
+var InitValueInCell = InitValue.Mul(InitValue, big.NewInt(int64(math.Pow10(18))))
 
 // GenesisAccounts are used to initialized accounts in genesis block
 var GenesisAccounts = map[string]*big.Int{
@@ -725,9 +725,13 @@ func GetContractDetailsByIndex(index int) (common.Address, string) {
 
 func GetRateFromType(chain string) *big.Int {
 	switch chain {
-	case NEO: return big.NewInt(RateNEO)
-	case TRON: return big.NewInt(RateTRON)
-	case ETH: return big.NewInt(RateETH)
-	default: return nil
+	case NEO:
+		return big.NewInt(RateNEO)
+	case TRON:
+		return big.NewInt(RateTRON)
+	case ETH:
+		return big.NewInt(RateETH)
+	default:
+		return nil
 	}
 }
