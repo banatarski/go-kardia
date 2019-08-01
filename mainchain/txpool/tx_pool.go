@@ -88,6 +88,10 @@ var (
 	// than some meaningful limit a user might use. This is not a consensus error
 	// making the transaction invalid, rather a DOS protection.
 	ErrOversizedData = errors.New("oversized data")
+
+	// ErrExceedBlockSizeLimit is returned if the input data exceed block size
+	// limit when creating new block
+	ErrExceedBlockSizeLimit = errors.New("oversized block size limit")
 )
 
 var (
