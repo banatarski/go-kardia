@@ -34,6 +34,7 @@ import (
 	"github.com/kardiachain/go-kardia/lib/log"
 	"github.com/kardiachain/go-kardia/lib/p2p"
 	"github.com/kardiachain/go-kardia/lib/p2p/discover"
+	"github.com/kardiachain/go-kardia/lib/worker"
 	"github.com/kardiachain/go-kardia/mainchain/txpool"
 	"github.com/kardiachain/go-kardia/types"
 )
@@ -43,8 +44,10 @@ const (
 	estHeaderRlpSize  = 500             // Approximate size of an RLP encoded block header
 	// txChanSize is the size of channel listening to NewTxsEvent.
 	// The number is referenced from the size of tx pool.
-	txChanSize = 4096
-	csChanSize = 4096 // Consensus channel size.
+	txChanSize         = 4096
+	csChanSize         = 4096 // Consensus channel size.
+	txsWorker          = 8
+	txsWorkerQueueSize = 1024
 )
 
 // errIncompatibleConfig is returned if the requested protocols and configs are
@@ -430,9 +433,14 @@ func (pm *ProtocolManager) BroadcastTxs(txs types.Transactions) {
 		}
 		pm.logger.Trace("Broadcast transaction", "hash", tx.Hash(), "recipients", len(peers))
 	}
-	// FIXME include this again: peers = peers[:int(math.Sqrt(float64(len(peers))))]
+
+	txsPool := worker.New(txsWorker, txsWorkerQueueSize)
+
 	for peer, txs := range txsSet {
-		peer.AsyncSendTransactions(txs)
+		txs := txs
+		txsPool.Submit(func() {
+			peer.AsyncSendTransactions(txs)
+		})
 	}
 }
 
