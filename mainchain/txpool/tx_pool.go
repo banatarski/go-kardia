@@ -21,7 +21,6 @@ package txpool
 import (
 	"errors"
 	"fmt"
-	"math"
 	"math/big"
 	"path/filepath"
 	"sort"
@@ -1056,67 +1055,67 @@ func (pool *TxPool) runReorg(done chan struct{}, reset *txpoolResetRequest, dirt
 // of the transaction pool is valid with regard to the chain state.
 func (pool *TxPool) reset(oldHead, newHead *types.Header) {
 	// If we're reorging an old state, reinject all dropped transactions
-	var reinject types.Transactions
+	// var reinject types.Transactions
 
-	if oldHead != nil && oldHead.Hash() != newHead.LastCommitHash {
-		// If the reorg is too deep, avoid doing it (will happen during fast sync)
-		oldNum := oldHead.Height
-		newNum := newHead.Height
+	// if oldHead != nil && oldHead.Hash() != newHead.LastCommitHash {
+	// 	// If the reorg is too deep, avoid doing it (will happen during fast sync)
+	// 	oldNum := oldHead.Height
+	// 	newNum := newHead.Height
 
-		if depth := uint64(math.Abs(float64(oldNum) - float64(newNum))); depth > 64 {
-			pool.logger.Debug("Skipping deep transaction reorg", "depth", depth)
-		} else {
-			// Reorg seems shallow enough to pull in all transactions into memory
-			var discarded, included types.Transactions
-			var (
-				rem = pool.chain.GetBlock(oldHead.Hash(), oldHead.Height)
-				add = pool.chain.GetBlock(newHead.Hash(), newHead.Height)
-			)
-			if rem == nil {
-				// This can happen if a setHead is performed, where we simply discard the old
-				// head from the chain.
-				// If that is the case, we don't have the lost transactions any more, and
-				// there's nothing to add
-				if newNum < oldNum {
-					// If the reorg ended up on a lower number, it's indicative of setHead being the cause
-					pool.logger.Debug("Skipping transaction reset caused by setHead",
-						"old", oldHead.Hash(), "oldnum", oldNum, "new", newHead.Hash(), "newnum", newNum)
-				} else {
-					// If we reorged to a same or higher number, then it's not a case of setHead
-					pool.logger.Warn("Transaction pool reset with missing oldhead",
-						"old", oldHead.Hash(), "oldnum", oldNum, "new", newHead.Hash(), "newnum", newNum)
-				}
-				return
-			}
-			for rem.Height() > add.Height() {
-				discarded = append(discarded, rem.Transactions()...)
-				if rem = pool.chain.GetBlock(rem.LastCommitHash(), rem.Height()-1); rem == nil {
-					pool.logger.Error("Unrooted old chain seen by tx pool", "block", oldHead.Height, "hash", oldHead.Hash())
-					return
-				}
-			}
-			for add.Height() > rem.Height() {
-				included = append(included, add.Transactions()...)
-				if add = pool.chain.GetBlock(add.LastCommitHash(), add.Height()-1); add == nil {
-					pool.logger.Error("Unrooted new chain seen by tx pool", "block", newHead.Height, "hash", newHead.Hash())
-					return
-				}
-			}
-			for rem.Hash() != add.Hash() {
-				discarded = append(discarded, rem.Transactions()...)
-				if rem = pool.chain.GetBlock(rem.LastCommitHash(), rem.Height()-1); rem == nil {
-					pool.logger.Error("Unrooted old chain seen by tx pool", "block", oldHead.Height, "hash", oldHead.Hash())
-					return
-				}
-				included = append(included, add.Transactions()...)
-				if add = pool.chain.GetBlock(add.LastCommitHash(), add.Height()-1); add == nil {
-					pool.logger.Error("Unrooted new chain seen by tx pool", "block", newHead.Height, "hash", newHead.Hash())
-					return
-				}
-			}
-			reinject = types.TxDifference(discarded, included)
-		}
-	}
+	// 	if depth := uint64(math.Abs(float64(oldNum) - float64(newNum))); depth > 64 {
+	// 		pool.logger.Debug("Skipping deep transaction reorg", "depth", depth)
+	// 	} else {
+	// 		// Reorg seems shallow enough to pull in all transactions into memory
+	// 		var discarded, included types.Transactions
+	// 		var (
+	// 			rem = pool.chain.GetBlock(oldHead.Hash(), oldHead.Height)
+	// 			add = pool.chain.GetBlock(newHead.Hash(), newHead.Height)
+	// 		)
+	// 		if rem == nil {
+	// 			// This can happen if a setHead is performed, where we simply discard the old
+	// 			// head from the chain.
+	// 			// If that is the case, we don't have the lost transactions any more, and
+	// 			// there's nothing to add
+	// 			if newNum < oldNum {
+	// 				// If the reorg ended up on a lower number, it's indicative of setHead being the cause
+	// 				pool.logger.Debug("Skipping transaction reset caused by setHead",
+	// 					"old", oldHead.Hash(), "oldnum", oldNum, "new", newHead.Hash(), "newnum", newNum)
+	// 			} else {
+	// 				// If we reorged to a same or higher number, then it's not a case of setHead
+	// 				pool.logger.Warn("Transaction pool reset with missing oldhead",
+	// 					"old", oldHead.Hash(), "oldnum", oldNum, "new", newHead.Hash(), "newnum", newNum)
+	// 			}
+	// 			return
+	// 		}
+	// 		for rem.Height() > add.Height() {
+	// 			discarded = append(discarded, rem.Transactions()...)
+	// 			if rem = pool.chain.GetBlock(rem.LastCommitHash(), rem.Height()-1); rem == nil {
+	// 				pool.logger.Error("Unrooted old chain seen by tx pool", "block", oldHead.Height, "hash", oldHead.Hash())
+	// 				return
+	// 			}
+	// 		}
+	// 		for add.Height() > rem.Height() {
+	// 			included = append(included, add.Transactions()...)
+	// 			if add = pool.chain.GetBlock(add.LastCommitHash(), add.Height()-1); add == nil {
+	// 				pool.logger.Error("Unrooted new chain seen by tx pool", "block", newHead.Height, "hash", newHead.Hash())
+	// 				return
+	// 			}
+	// 		}
+	// 		for rem.Hash() != add.Hash() {
+	// 			discarded = append(discarded, rem.Transactions()...)
+	// 			if rem = pool.chain.GetBlock(rem.LastCommitHash(), rem.Height()-1); rem == nil {
+	// 				pool.logger.Error("Unrooted old chain seen by tx pool", "block", oldHead.Height, "hash", oldHead.Hash())
+	// 				return
+	// 			}
+	// 			included = append(included, add.Transactions()...)
+	// 			if add = pool.chain.GetBlock(add.LastCommitHash(), add.Height()-1); add == nil {
+	// 				pool.logger.Error("Unrooted new chain seen by tx pool", "block", newHead.Height, "hash", newHead.Hash())
+	// 				return
+	// 			}
+	// 		}
+	// 		reinject = types.TxDifference(discarded, included)
+	// 	}
+	// }
 	// Initialize the internal state to the current head
 	if newHead == nil {
 		newHead = pool.chain.CurrentBlock().Header() // Special case during testing
@@ -1131,9 +1130,9 @@ func (pool *TxPool) reset(oldHead, newHead *types.Header) {
 	pool.currentMaxGas = newHead.GasLimit
 
 	// Inject any transactions discarded due to reorgs
-	pool.logger.Debug("Reinjecting stale transactions", "count", len(reinject))
-	senderCacher.recover(reinject)
-	pool.addTxsLocked(reinject, false)
+	// pool.logger.Debug("Reinjecting stale transactions", "count", len(reinject))
+	// senderCacher.recover(reinject)
+	// pool.addTxsLocked(reinject, false)
 }
 
 func (pool *TxPool) promoteExecutables(accounts []common.Address) []*types.Transaction {

@@ -20,3 +20,4 @@ vendor/
 # Development mode
 lightnode
 go-kardia
+run.sh
