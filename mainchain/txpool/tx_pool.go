@@ -790,10 +790,10 @@ func (pool *TxPool) addTxs(txs []*types.Transaction, local, sync bool) []error {
 	}
 
 	pool.mu.Lock()
-	errs, dirtyAddrs := pool.addTxsLocked(txs, local)
+	errs, badAddrs := pool.addTxsLocked(txs, local)
 	pool.mu.Unlock()
 
-	done := pool.requestPromoteExecutables(dirtyAddrs)
+	done := pool.requestPromoteExecutables(badAddrs)
 	if sync {
 		<-done
 	}
@@ -803,17 +803,17 @@ func (pool *TxPool) addTxs(txs []*types.Transaction, local, sync bool) []error {
 // addTxsLocked attempts to queue a batch of transactions if they are valid.
 // The transaction pool lock must be held.
 func (pool *TxPool) addTxsLocked(txs []*types.Transaction, local bool) ([]error, *accountSet) {
-	dirty := newAccountSet()
+	bad := newAccountSet()
 	errs := make([]error, len(txs))
 	for i, tx := range txs {
 		replaced, err := pool.add(tx, local)
 		errs[i] = err
 		if err == nil && !replaced {
-			dirty.addTx(tx)
+			bad.addTx(tx)
 		}
 	}
-	validMeter.Mark(int64(len(dirty.accounts)))
-	return errs, dirty
+	validMeter.Mark(int64(len(bad.accounts)))
+	return errs, bad
 }
 
 // Status returns the status (unknown/pending/queued) of a batch of transactions
@@ -932,20 +932,20 @@ func (pool *TxPool) scheduleReorgLoop() {
 		nextDone      = make(chan struct{})
 		launchNextRun bool
 		reset         *txpoolResetRequest
-		dirtyAccounts *accountSet
+		badAccounts   *accountSet
 		queuedEvents  = make(map[common.Address]*txSortedMap)
 	)
 	for {
 		// Launch next background reorg if needed
 		if curDone == nil && launchNextRun {
 			// Run the background reorg and announcements
-			go pool.runReorg(nextDone, reset, dirtyAccounts, queuedEvents)
+			go pool.runReorg(nextDone, reset, badAccounts, queuedEvents)
 
 			// Prepare everything for the next round of reorg
 			curDone, nextDone = nextDone, make(chan struct{})
 			launchNextRun = false
 
-			reset, dirtyAccounts = nil, nil
+			reset, badAccounts = nil, nil
 			queuedEvents = make(map[common.Address]*txSortedMap)
 		}
 
@@ -962,10 +962,10 @@ func (pool *TxPool) scheduleReorgLoop() {
 
 		case req := <-pool.reqPromoteCh:
 			// Promote request: update address set if request is already pending.
-			if dirtyAccounts == nil {
-				dirtyAccounts = req
+			if badAccounts == nil {
+				badAccounts = req
 			} else {
-				dirtyAccounts.merge(req)
+				badAccounts.merge(req)
 			}
 			launchNextRun = true
 			pool.reorgDoneCh <- nextDone
@@ -1060,6 +1060,8 @@ func (pool *TxPool) runReorg(done chan struct{}, reset *txpoolResetRequest, dirt
 func (pool *TxPool) reset(oldHead, newHead *types.Header) {
 	// If we're reorging an old state, reinject all dropped transactions
 	// var reinject types.Transactions
+	// For now we will drop all txs if it has been rejected.
+	// @luu: will enable this for mainnet
 
 	// if oldHead != nil && oldHead.Hash() != newHead.LastCommitHash {
 	// 	// If the reorg is too deep, avoid doing it (will happen during fast sync)

@@ -18,6 +18,6 @@
 vendor/
 
 # Development mode
-lightnode
+lightchain
 go-kardia
 run.sh

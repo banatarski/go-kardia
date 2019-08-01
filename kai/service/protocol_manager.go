@@ -420,18 +420,18 @@ func (pm *ProtocolManager) Broadcast(msg interface{}, msgType uint64) {
 // BroadcastTxs will propagate a batch of transactions to all peers which are not known to
 // already have the given transaction.
 func (pm *ProtocolManager) BroadcastTxs(txs types.Transactions) {
-	var txset = make(map[*peer]types.Transactions)
+	var txsSet = make(map[*peer]types.Transactions)
 	pm.logger.Info("Start broadcast txs", "number of txs", len(txs))
 	// Broadcast transactions to a batch of peers not knowing about it
 	for _, tx := range txs {
 		peers := pm.peers.PeersWithoutTx(tx.Hash())
 		for _, peer := range peers {
-			txset[peer] = append(txset[peer], tx)
+			txsSet[peer] = append(txsSet[peer], tx)
 		}
 		pm.logger.Trace("Broadcast transaction", "hash", tx.Hash(), "recipients", len(peers))
 	}
 	// FIXME include this again: peers = peers[:int(math.Sqrt(float64(len(peers))))]
-	for peer, txs := range txset {
+	for peer, txs := range txsSet {
 		peer.AsyncSendTransactions(txs)
 	}
 }
