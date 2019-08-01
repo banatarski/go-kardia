@@ -167,12 +167,12 @@ var DefaultTxPoolConfig = TxPoolConfig{
 
 	PriceLimit:   1,
 	PriceBump:    10,
-	AccountSlots: 64,
-	GlobalSlots:  16384,
-	AccountQueue: 256,
-	GlobalQueue:  4096,
+	AccountSlots: 8192,
+	GlobalSlots:  262144,
+	AccountQueue: 4096,
+	GlobalQueue:  65536,
 
-	Lifetime: 3 * time.Hour,
+	Lifetime: 1 * time.Hour,
 }
 
 // GetDefaultTxPoolConfig returns default txPoolConfig with given dir path

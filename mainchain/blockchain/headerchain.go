@@ -31,8 +31,8 @@ import (
 )
 
 const (
-	headerCacheLimit = 512
-	heightCacheLimit = 2048
+	headerCacheLimit = 1024
+	heightCacheLimit = 4086
 )
 
 //TODO(huny@): Add detailed description
