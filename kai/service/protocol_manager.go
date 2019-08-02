@@ -439,10 +439,10 @@ func (pm *ProtocolManager) BroadcastTxs(txs types.Transactions) {
 	// bottleneck in the pipeline.
 	// TODO(@luu): improve this as global configs and depends on config of the txpool and/or
 	// while proposing collectTransaction()
+	// Consider moving this mechanism inside AysncSendTractions
 	txsPool := worker.New(txsWorker, txsWorkerQueueSize)
 	for peer, txs := range txsSet {
 		txs := txs
-		pm.logger.Info("[Workerpool] Start breaking transactions batch into trunks: total", len(txs))
 		txsPool.SubmitWait(func() {
 			peer.AsyncSendTransactions(txs)
 		})
