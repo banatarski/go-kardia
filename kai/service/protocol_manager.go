@@ -434,10 +434,16 @@ func (pm *ProtocolManager) BroadcastTxs(txs types.Transactions) {
 		pm.logger.Trace("Broadcast transaction", "hash", tx.Hash(), "recipients", len(peers))
 	}
 
+	// This mechanism simulations the block partitioning, break transactions list into trunks
+	// and use a workerpool to append and send transactions as smaller batch to peers, advoid
+	// bottleneck in the pipeline.
+	// TODO(@luu): improve this as global configs and depends on config of the txpool and/or
+	// while proposing collectTransaction()
 	txsPool := worker.New(txsWorker, txsWorkerQueueSize)
 	for peer, txs := range txsSet {
 		txs := txs
-		txsPool.Submit(func() {
+		pm.logger.Info("[Workerpool] Start breaking transactions batch into trunks: total", len(txs))
+		txsPool.SubmitWait(func() {
 			peer.AsyncSendTransactions(txs)
 		})
 	}
