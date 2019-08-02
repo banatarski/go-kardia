@@ -34,7 +34,6 @@ import (
 	"github.com/kardiachain/go-kardia/lib/log"
 	"github.com/kardiachain/go-kardia/lib/p2p"
 	"github.com/kardiachain/go-kardia/lib/p2p/discover"
-	"github.com/kardiachain/go-kardia/lib/worker"
 	"github.com/kardiachain/go-kardia/mainchain/txpool"
 	"github.com/kardiachain/go-kardia/types"
 )
@@ -44,10 +43,8 @@ const (
 	estHeaderRlpSize  = 500             // Approximate size of an RLP encoded block header
 	// txChanSize is the size of channel listening to NewTxsEvent.
 	// The number is referenced from the size of tx pool.
-	txChanSize         = 4096
-	csChanSize         = 4096 // Consensus channel size.
-	txsWorker          = 4
-	txsWorkerQueueSize = 4096
+	txChanSize = 4096
+	csChanSize = 4096 // Consensus channel size.
 )
 
 // errIncompatibleConfig is returned if the requested protocols and configs are
@@ -434,20 +431,9 @@ func (pm *ProtocolManager) BroadcastTxs(txs types.Transactions) {
 		pm.logger.Trace("Broadcast transaction", "hash", tx.Hash(), "recipients", len(peers))
 	}
 
-	// This mechanism simulations the block partitioning, break transactions list into trunks
-	// and use a workerpool to append and send transactions as smaller batch to peers, advoid
-	// bottleneck in the pipeline.
-	// TODO(@luu): improve this as global configs and depends on config of the txpool and/or
-	// while proposing collectTransaction()
-	// Consider moving this mechanism inside AysncSendTractions
-	txsPool := worker.New(txsWorker, txsWorkerQueueSize)
 	for peer, txs := range txsSet {
-		txs := txs
-		txsPool.SubmitWait(func() {
-			peer.AsyncSendTransactions(txs)
-		})
+		peer.AsyncSendTransactions(txs)
 	}
-	txsPool.StopWait()
 }
 
 // NodeInfo represents a short summary of the Kardia sub-protocol metadata
