@@ -10,7 +10,7 @@ import (
 const (
 	// If worker pool receives no new work for this period of time, then stop
 	// a worker goroutine.
-	idleTimeoutSec = 5
+	idleTimeoutSec = 1
 )
 
 // New creates and starts a pool of worker goroutines.
@@ -21,7 +21,7 @@ const (
 func New(maxWorkers, queueSize int) *WorkerPool {
 	// There must be at least one worker.
 	if maxWorkers < 1 {
-		maxWorkers = 1
+		maxWorkers = 2
 	}
 
 	pool := &WorkerPool{

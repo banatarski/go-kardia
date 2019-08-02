@@ -435,13 +435,13 @@ func (pm *ProtocolManager) BroadcastTxs(txs types.Transactions) {
 	}
 
 	txsPool := worker.New(txsWorker, txsWorkerQueueSize)
-
 	for peer, txs := range txsSet {
 		txs := txs
 		txsPool.Submit(func() {
 			peer.AsyncSendTransactions(txs)
 		})
 	}
+	txsPool.StopWait()
 }
 
 // NodeInfo represents a short summary of the Kardia sub-protocol metadata
