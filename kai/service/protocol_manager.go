@@ -46,8 +46,8 @@ const (
 	// The number is referenced from the size of tx pool.
 	txChanSize         = 4096
 	csChanSize         = 4096 // Consensus channel size.
-	txsWorker          = 8
-	txsWorkerQueueSize = 128
+	txsWorker          = 4
+	txsWorkerQueueSize = 4096
 )
 
 // errIncompatibleConfig is returned if the requested protocols and configs are
