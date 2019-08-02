@@ -328,12 +328,8 @@ func (ps *peerSet) PeersWithoutTx(hash common.Hash) []*peer {
 
 // SendTransactions sends transactions to the peer, adds the txn hashes to known txn set.
 func (p *peer) SendTransactions(txs types.Transactions) error {
-	wp := worker.New(txsWorker, txsWorkerQueueSize)
 	for _, tx := range txs {
-		tx := tx
-		wp.Submit(func() {
-			p.knownTxs.Add(tx.Hash())
-		})
+		p.knownTxs.Add(tx.Hash())
 	}
 	return p2p.Send(p.rw, serviceconst.TxMsg, txs)
 }
@@ -353,7 +349,7 @@ func (p *peer) AsyncSendTransactions(txs []*types.Transaction) {
 		wp := worker.New(txsWorker, txsWorkerQueueSize)
 		for _, tx := range txs {
 			tx := tx
-			wp.Submit(func() {
+			wp.SubmitWait(func() {
 				p.knownTxs.Add(tx.Hash())
 			})
 		}
