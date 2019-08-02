@@ -49,7 +49,7 @@ const (
 	// maxQueuedTxs is the maximum number of transaction lists to queue up before
 	// dropping broadcasts. This is a sensitive number as a transaction list might
 	// contain a single transaction, or thousands.
-	maxQueuedTxs = 4096
+	maxQueuedTxs = 8192
 
 	// WorkerPool for AsyncSendTransactions
 	txsWorker          = 4
@@ -328,8 +328,12 @@ func (ps *peerSet) PeersWithoutTx(hash common.Hash) []*peer {
 
 // SendTransactions sends transactions to the peer, adds the txn hashes to known txn set.
 func (p *peer) SendTransactions(txs types.Transactions) error {
+	wp := worker.New(txsWorker, txsWorkerQueueSize)
 	for _, tx := range txs {
-		p.knownTxs.Add(tx.Hash())
+		tx := tx
+		wp.Submit(func() {
+			p.knownTxs.Add(tx.Hash())
+		})
 	}
 	return p2p.Send(p.rw, serviceconst.TxMsg, txs)
 }
@@ -345,7 +349,6 @@ func (p *peer) AsyncSendTransactions(txs []*types.Transaction) {
 		// bottleneck in the pipeline.
 		// TODO(@luu): improve this as global configs and depends on config of the txpool and/or
 		// while proposing collectTransaction()
-		// Consider moving this mechanism inside AysncSendTractions
 
 		wp := worker.New(txsWorker, txsWorkerQueueSize)
 		for _, tx := range txs {
