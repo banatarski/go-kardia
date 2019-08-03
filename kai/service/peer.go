@@ -342,7 +342,7 @@ func (p *peer) AsyncSendTransactions(txs []*types.Transaction) {
 		// TODO(@luu): improve this as global configs and depends on config of the txpool and/or
 		// while proposing collectTransaction()
 
-		wp := worker.New(txsWorker, txsWorkerQueueSize)
+		wp := worker.New(txsWorker, maxQueuedTxs)
 		for _, tx := range txs {
 			tx := tx
 			wp.Submit(func() {
