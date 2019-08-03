@@ -290,7 +290,10 @@ func (p *peer) broadcast() {
 		select {
 		case txs := <-p.queuedTxs:
 			go func() {
-				p.AsyncSendTransactions(txs)
+				if err := p.SendTransactions(txs); err != nil {
+					p.logger.Error("Send txs failed", "err", err, "count", len(txs))
+					return
+				}
 				p.logger.Trace("Transactions sent", "count", len(txs))
 			}()
 		case <-p.terminated:
@@ -345,7 +348,7 @@ func (p *peer) AsyncSendTransactions(txs []*types.Transaction) {
 		// TODO(@luu): improve this as global configs and depends on config of the txpool and/or
 		// while proposing collectTransaction()
 
-		wp := worker.New(txsWorker, maxQueuedTxs)
+		wp := worker.New(txsWorker, txsWorkerQueueSize)
 		for _, tx := range txs {
 			tx := tx
 			wp.Submit(func() {
