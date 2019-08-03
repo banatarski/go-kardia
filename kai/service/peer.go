@@ -290,7 +290,7 @@ func (p *peer) broadcast() {
 		select {
 		case txs := <-p.queuedTxs:
 			p.AsyncSendTransactions(txs)
-
+			p.logger.Trace("Transactions sent", "count", len(txs))
 		case <-p.terminated:
 			return
 		}
