@@ -289,11 +289,7 @@ func (p *peer) broadcast() {
 	for {
 		select {
 		case txs := <-p.queuedTxs:
-			if err := p.SendTransactions(txs); err != nil {
-				p.logger.Error("Send txs failed", "err", err, "count", len(txs))
-				return
-			}
-			p.logger.Trace("Transactions sent", "count", len(txs))
+			p.AsyncSendTransactions(txs)
 
 		case <-p.terminated:
 			return
@@ -349,11 +345,11 @@ func (p *peer) AsyncSendTransactions(txs []*types.Transaction) {
 		wp := worker.New(txsWorker, txsWorkerQueueSize)
 		for _, tx := range txs {
 			tx := tx
-			wp.SubmitWait(func() {
+			wp.Submit(func() {
 				p.knownTxs.Add(tx.Hash())
 			})
 		}
-		// Will wait for all batch and queued to finish
+		// Will wait for all batches and queue until finished
 		wp.StopWait()
 	default:
 		p.logger.Debug("Dropping transaction propagation", "count", len(txs))
