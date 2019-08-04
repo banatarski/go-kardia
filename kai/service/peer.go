@@ -30,7 +30,6 @@ import (
 	"github.com/kardiachain/go-kardia/lib/common"
 	"github.com/kardiachain/go-kardia/lib/log"
 	"github.com/kardiachain/go-kardia/lib/p2p"
-	"github.com/kardiachain/go-kardia/lib/worker"
 	"github.com/kardiachain/go-kardia/types"
 )
 
@@ -348,15 +347,15 @@ func (p *peer) AsyncSendTransactions(txs []*types.Transaction) {
 		// TODO(@luu): improve this as global configs and depends on config of the txpool and/or
 		// while proposing collectTransaction()
 
-		wp := worker.New(txsWorker, txsWorkerQueueSize)
+		// wp := worker.New(txsWorker, txsWorkerQueueSize)
 		for _, tx := range txs {
-			tx := tx
-			wp.Submit(func() {
-				p.knownTxs.Add(tx.Hash())
-			})
+			// tx := tx
+			// wp.Submit(func() {
+			p.knownTxs.Add(tx.Hash())
+			// })
 		}
 		// Will wait for all batches and queue until finished
-		wp.StopWait()
+		// wp.StopWait()
 	default:
 		p.logger.Debug("Dropping transaction propagation", "count", len(txs))
 	}

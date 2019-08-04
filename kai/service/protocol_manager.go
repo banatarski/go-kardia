@@ -43,8 +43,8 @@ const (
 	estHeaderRlpSize  = 500             // Approximate size of an RLP encoded block header
 	// txChanSize is the size of channel listening to NewTxsEvent.
 	// The number is referenced from the size of tx pool.
-	txChanSize = 8192
-	csChanSize = 8192 // Consensus channel size.
+	txChanSize = 16384
+	csChanSize = 16384 // Consensus channel size.
 
 	// WorkerPool for AsyncSendTransactions
 	// txsWorker          = 4
@@ -370,7 +370,7 @@ func (pm *ProtocolManager) syncTransactions(p *peer) {
 	if pm.txpool == nil {
 		return
 	}
-	pm.logger.Trace("Sync txns to new peer", "peer", p)
+	pm.logger.Trace("Sync txs to new peer", "peer", p)
 	// TODO(thientn): sends transactions in chunks. This may send a large number of transactions.
 	// Breaks them to chunks here or inside AsyncSend to not overload the pipeline.
 	txsMap, _ := pm.txpool.Pending()
