@@ -30,7 +30,6 @@ import (
 	"github.com/kardiachain/go-kardia/lib/common"
 	"github.com/kardiachain/go-kardia/lib/log"
 	"github.com/kardiachain/go-kardia/lib/p2p"
-	"github.com/kardiachain/go-kardia/lib/worker"
 	"github.com/kardiachain/go-kardia/types"
 )
 
@@ -44,16 +43,16 @@ var (
 
 const (
 	handshakeTimeout = 5 * time.Second
-	maxKnownTxs      = 32768 // Maximum transactions hashes to keep in the known list (prevent DOS)
+	maxKnownTxs      = 65536 // Maximum transactions hashes to keep in the known list (prevent DOS)
 
 	// maxQueuedTxs is the maximum number of transaction lists to queue up before
 	// dropping broadcasts. This is a sensitive number as a transaction list might
 	// contain a single transaction, or thousands.
-	maxQueuedTxs = 1024
+	maxQueuedTxs = 4096
 
 	// WorkerPool for AsyncSendTransactions
-	txsWorker         = 8
-	txsWorkerChanSize = 8
+	txsWorker         = 4
+	txsWorkerChanSize = 32
 )
 
 // PeerInfo represents a short summary of the Kai sub-protocol metadata known
@@ -351,19 +350,20 @@ func (p *peer) AsyncSendTransactions(txs []*types.Transaction) {
 		// TODO(@luu): improve this as global configs and depends on config of the txpool and/or
 		// while proposing collectTransaction()
 
-		wp := worker.New(txsWorker, txsWorkerChanSize)
+		// wp := worker.New(txsWorker, txsWorkerChanSize)
 		for _, tx := range txs {
-			tx := tx
-			wp.Submit(func() {
-				p.knownTxs.Add(tx.Hash())
-			})
+			// tx := tx
+			// wp.Submit(func() {
+			p.knownTxs.Add(tx.Hash())
+			// })
 		}
 		// Will wait for all batches and queue until finished
-		wp.StopWait()
+		// wp.StopWait()
 
 		for p.knownTxs.Cardinality() >= maxKnownTxs {
 			p.knownTxs.Pop()
 		}
+
 	default:
 		p.logger.Debug("Dropping transaction propagation", "count", len(txs))
 	}

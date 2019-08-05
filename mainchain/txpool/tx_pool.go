@@ -170,8 +170,8 @@ var DefaultTxPoolConfig = TxPoolConfig{
 
 	AccountSlots: 64,
 	GlobalSlots:  8196,
-	AccountQueue: 256,
-	GlobalQueue:  8196,
+	AccountQueue: 128,
+	GlobalQueue:  4096,
 
 	Lifetime: 1 * time.Hour,
 }
