@@ -165,12 +165,13 @@ var DefaultTxPoolConfig = TxPoolConfig{
 	Journal:   "transactions.rlp",
 	Rejournal: time.Hour,
 
-	PriceLimit:   1,
-	PriceBump:    10,
-	AccountSlots: 4096,
-	GlobalSlots:  32768,
-	AccountQueue: 2048,
-	GlobalQueue:  16384,
+	PriceLimit: 1,
+	PriceBump:  10,
+
+	AccountSlots: 64,
+	GlobalSlots:  8196,
+	AccountQueue: 256,
+	GlobalQueue:  8196,
 
 	Lifetime: 1 * time.Hour,
 }

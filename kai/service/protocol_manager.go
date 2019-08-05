@@ -43,8 +43,8 @@ const (
 	estHeaderRlpSize  = 500             // Approximate size of an RLP encoded block header
 	// txChanSize is the size of channel listening to NewTxsEvent.
 	// The number is referenced from the size of tx pool.
-	txChanSize = 16384
-	csChanSize = 16384 // Consensus channel size.
+	txChanSize = 8192
+	csChanSize = 8192 // Consensus channel size.
 
 	// WorkerPool for AsyncSendTransactions
 	// txsWorker          = 4

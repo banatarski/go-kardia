@@ -49,11 +49,11 @@ const (
 	// maxQueuedTxs is the maximum number of transaction lists to queue up before
 	// dropping broadcasts. This is a sensitive number as a transaction list might
 	// contain a single transaction, or thousands.
-	maxQueuedTxs = 8192
+	maxQueuedTxs = 1024
 
 	// WorkerPool for AsyncSendTransactions
-	txsWorker         = 4
-	txsWorkerChanSize = 16
+	txsWorker         = 8
+	txsWorkerChanSize = 8
 )
 
 // PeerInfo represents a short summary of the Kai sub-protocol metadata known
@@ -332,6 +332,9 @@ func (p *peer) SendTransactions(txs types.Transactions) error {
 	for _, tx := range txs {
 		p.knownTxs.Add(tx.Hash())
 	}
+	for p.knownTxs.Cardinality() >= maxKnownTxs {
+		p.knownTxs.Pop()
+	}
 	return p2p.Send(p.rw, serviceconst.TxMsg, txs)
 }
 
@@ -357,6 +360,10 @@ func (p *peer) AsyncSendTransactions(txs []*types.Transaction) {
 		}
 		// Will wait for all batches and queue until finished
 		wp.StopWait()
+
+		for p.knownTxs.Cardinality() >= maxKnownTxs {
+			p.knownTxs.Pop()
+		}
 	default:
 		p.logger.Debug("Dropping transaction propagation", "count", len(txs))
 	}
