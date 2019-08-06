@@ -18,7 +18,10 @@
 
 package events
 
-import "github.com/kardiachain/go-kardia/types"
+import (
+	"github.com/kardiachain/go-kardia/lib/common"
+	"github.com/kardiachain/go-kardia/types"
+)
 
 // Posted when a batch of transactions enter the dual's event pool.
 type NewDualEventsEvent struct{ Events []*types.DualEvent }
@@ -28,3 +31,9 @@ type ChainHeadEvent struct{ Block *types.Block }
 
 // NewTxsEvent is posted when a batch of transactions enter the transaction pool.
 type NewTxsEvent struct{ Txs []*types.Transaction }
+
+type ChainEvent struct {
+	Block *types.Block
+	Hash  common.Hash
+	Logs  []*types.Log
+}

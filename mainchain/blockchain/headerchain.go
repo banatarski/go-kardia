@@ -21,8 +21,7 @@ package blockchain
 import (
 	"sync/atomic"
 
-	"github.com/hashicorp/golang-lru"
-
+	lru "github.com/hashicorp/golang-lru"
 	"github.com/kardiachain/go-kardia/configs"
 	"github.com/kardiachain/go-kardia/kai/chaindb"
 	"github.com/kardiachain/go-kardia/kai/storage"

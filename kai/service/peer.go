@@ -43,7 +43,7 @@ var (
 
 const (
 	handshakeTimeout = 5 * time.Second
-	maxKnownTxs      = 65536 // Maximum transactions hashes to keep in the known list (prevent DOS)
+	maxKnownTxs      = 32768 // Maximum transactions hashes to keep in the known list (prevent DOS)
 
 	// maxQueuedTxs is the maximum number of transaction lists to queue up before
 	// dropping broadcasts. This is a sensitive number as a transaction list might
@@ -52,7 +52,7 @@ const (
 
 	// WorkerPool for AsyncSendTransactions
 	txsWorker         = 4
-	txsWorkerChanSize = 32
+	txsWorkerChanSize = 16
 )
 
 // PeerInfo represents a short summary of the Kai sub-protocol metadata known

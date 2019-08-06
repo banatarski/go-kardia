@@ -173,7 +173,7 @@ func NewBlockChain(logger log.Logger, db kaidb.Database, chainConfig *configs.Ch
 	return bc, nil
 }
 
-// GetBlockByNumber retrieves a block from the database by number, caching it
+// GetBlockByHeight retrieves a block from the database by number, caching it
 // (associated with its hash) if found.
 func (bc *BlockChain) GetBlockByHeight(height uint64) *types.Block {
 	hash := chaindb.ReadCanonicalHash(bc.db, height)
@@ -474,3 +474,12 @@ func (bc *BlockChain) WriteCommit(height uint64, commit *types.Commit) {
 func (bc *BlockChain) ReadCommit(height uint64) *types.Commit {
 	return chaindb.ReadCommit(bc.db, height)
 }
+
+// WriteStatus status of write
+type WriteStatus byte
+
+const (
+	NonStatTy WriteStatus = iota
+	CanonStatTy
+	SideStatTy
+)

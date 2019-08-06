@@ -179,18 +179,18 @@ type ConsensusConfig struct {
 // DefaultConsensusConfig returns a default configuration for the consensus service
 func DefaultConsensusConfig() *ConsensusConfig {
 	return &ConsensusConfig{
-		TimeoutPropose:              1000,
+		TimeoutPropose:              3000,
 		TimeoutProposeDelta:         500,
-		TimeoutPrevote:              500,
+		TimeoutPrevote:              1000,
 		TimeoutPrevoteDelta:         500,
-		TimeoutPrecommit:            500,
+		TimeoutPrecommit:            1000,
 		TimeoutPrecommitDelta:       500,
-		TimeoutCommit:               500,
+		TimeoutCommit:               1000,
 		SkipTimeoutCommit:           false,
 		CreateEmptyBlocks:           true,
 		CreateEmptyBlocksInterval:   0,
 		PeerGossipSleepDuration:     500,
-		PeerQueryMaj23SleepDuration: 500,
+		PeerQueryMaj23SleepDuration: 1000,
 	}
 }
 
