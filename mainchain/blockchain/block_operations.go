@@ -69,8 +69,8 @@ func (bo *BlockOperations) CreateProposalBlock(height int64, lastBlockID types.B
 	txs := bo.collectTransactions()
 	bo.logger.Debug("Collected transactions", "txs", txs)
 
-	// header := bo.newHeader(height, uint64(len(txs)), lastBlockID, lastValidatorHash)
-	header := bo.newHeader(height, lastBlockID, lastValidatorHash)
+	header := bo.newHeader(height, uint64(len(txs)), lastBlockID, lastValidatorHash)
+
 	bo.logger.Info("Creates new header", "header", header)
 
 	stateRoot, receipts, err := bo.commitTransactions(txs, header)
@@ -193,23 +193,12 @@ func (bo *BlockOperations) LoadSeenCommit(height uint64) *types.Commit {
 
 // newHeader creates new block header from given data.
 // Some header fields are not ready at this point.
-// func (bo *BlockOperations) newHeader(height int64, numTxs uint64, blockId types.BlockID, validatorsHash common.Hash) *types.Header {
-// 	return &types.Header{
-// 		// ChainID: state.ChainID, TODO(huny/namdoh): confims that ChainID is replaced by network id.
-// 		Height:         uint64(height),
-// 		Time:           big.NewInt(time.Now().Unix()),
-// 		NumTxs:         numTxs,
-// 		LastBlockID:    blockId,
-// 		ValidatorsHash: validatorsHash,
-// 		GasLimit:       10000000,
-// 	}
-// }
-
-func (bo *BlockOperations) newHeader(height int64, blockId types.BlockID, validatorsHash common.Hash) *types.Header {
+func (bo *BlockOperations) newHeader(height int64, numTxs uint64, blockId types.BlockID, validatorsHash common.Hash) *types.Header {
 	return &types.Header{
 		// ChainID: state.ChainID, TODO(huny/namdoh): confims that ChainID is replaced by network id.
 		Height:         uint64(height),
 		Time:           big.NewInt(time.Now().Unix()),
+		NumTxs:         numTxs,
 		LastBlockID:    blockId,
 		ValidatorsHash: validatorsHash,
 		GasLimit:       10000000,

@@ -26,6 +26,7 @@ import (
 
 	cstypes "github.com/kardiachain/go-kardia/consensus/types"
 	service "github.com/kardiachain/go-kardia/kai/service/const"
+	"github.com/kardiachain/go-kardia/lib/common"
 	cmn "github.com/kardiachain/go-kardia/lib/common"
 	"github.com/kardiachain/go-kardia/lib/log"
 	"github.com/kardiachain/go-kardia/lib/p2p"
@@ -190,12 +191,13 @@ func (conR *ConsensusManager) ReceiveNewProposal(generalMsg p2p.Msg, src *p2p.Pe
 		conR.logger.Error("Invalid proposal message", "msg", generalMsg, "err", err)
 		return
 	}
-	msg.Proposal.Block.SetLogger(conR.logger)
+	// msg.Proposal.Block.SetLogger(conR.logger)
 
-	conR.logger.Trace("Decoded msg", "msg", msg.Proposal)
-	if msg.Proposal.Block.LastCommit() == nil {
-		msg.Proposal.Block.SetLastCommit(&types.Commit{})
-	}
+	// TODO @luu: include this again
+	// conR.logger.Trace("Decoded msg", "msg", msg.Proposal)
+	// if msg.Proposal.Block.LastCommit() == nil {
+	// 	msg.Proposal.Block.SetLastCommit(&types.Commit{})
+	// }
 
 	// Get peer states
 	ps, ok := src.Get(conR.GetPeerStateKey()).(*PeerState)
@@ -335,9 +337,9 @@ func (conR *ConsensusManager) ReceiveNewCommit(generalMsg p2p.Msg, src *p2p.Peer
 		conR.logger.Error("Invalid commit step message", "msg", generalMsg, "err", err)
 		return
 	}
-	msg.Block.SetLogger(conR.logger)
+	// msg.Block.SetLogger(conR.logger)
 
-	conR.logger.Trace("Decoded msg", "msg", fmt.Sprintf("{Height:%v  Block:%v}", msg.Height, msg.Block))
+	conR.logger.Trace("Decoded msg", "msg", fmt.Sprintf("{Height:%v  Block:%v}", msg.Height, msg.BlockPartsHeader))
 
 	// Get peer states
 	ps, ok := src.Get(conR.GetPeerStateKey()).(*PeerState)
@@ -459,7 +461,7 @@ func (conR *ConsensusManager) broadcastNewRoundStepMessages(rs *cstypes.RoundSta
 		conR.protocol.Broadcast(nrsMsg, service.CsNewRoundStepMsg)
 	}
 	if csMsg != nil {
-		conR.logger.Trace("broadcastCommitStepMessage", "csMsg", fmt.Sprintf("{Height:%v  Block:%v}", csMsg.Height, csMsg.Block))
+		conR.logger.Trace("broadcastCommitStepMessage", "csMsg", fmt.Sprintf("{Height:%v  Block:%v}", csMsg.Height, csMsg.BlockPartsHeader))
 		conR.protocol.Broadcast(csMsg, service.CsCommitStepMsg)
 	}
 }
@@ -505,16 +507,17 @@ func (conR *ConsensusManager) sendNewRoundStepMessages(rw p2p.MsgReadWriter) {
 // ------------ Helpers to create messages -----
 func makeRoundStepMessages(rs *cstypes.RoundState) (nrsMsg *NewRoundStepMessage, csMsg *CommitStepMessage) {
 	nrsMsg = &NewRoundStepMessage{
-		Height: rs.Height,
-		Round:  rs.Round,
-		Step:   rs.Step,
+		Height:                rs.Height,
+		Round:                 rs.Round,
+		Step:                  rs.Step,
 		SecondsSinceStartTime: uint(time.Now().Unix() - rs.StartTime.Int64()),
 		LastCommitRound:       rs.LastCommit.Round(),
 	}
 	if rs.Step == cstypes.RoundStepCommit && rs.ProposalBlock != nil {
 		csMsg = &CommitStepMessage{
-			Height: rs.Height,
-			Block:  rs.ProposalBlock,
+			Height:           rs.Height,
+			BlockPartsHeader: rs.ProposalBlockParts.Header(),
+			BlockParts:       rs.ProposalBlockParts.BitArray(),
 		}
 	}
 	return
@@ -829,6 +832,18 @@ type ProposalPOLMessage struct {
 	ProposalPOL      *cmn.BitArray
 }
 
+// BlockPartMessage is sent when gossipping a piece of the proposed block.
+type BlockPartMessage struct {
+	Height *cmn.BigInt
+	Round  *cmn.BigInt
+	Part   *types.Part
+}
+
+// String returns a string representation.
+func (m *BlockPartMessage) String() string {
+	return fmt.Sprintf("[BlockPart H:%v R:%v P:%v]", m.Height, m.Round, m.Part)
+}
+
 // BlockMessage is sent when gossipping block.
 type BlockMessage struct {
 	Height *cmn.BigInt
@@ -893,8 +908,9 @@ func (m *VoteSetBitsMessage) String() string {
 
 // CommitStepMessage is sent when a block is committed.
 type CommitStepMessage struct {
-	Height *cmn.BigInt  `json:"height" gencodoc:"required"`
-	Block  *types.Block `json:"block" gencodoc:"required"`
+	Height           *cmn.BigInt         `json:"height" gencodoc:"required"`
+	BlockPartsHeader types.PartSetHeader `json:part_set_header`
+	BlockParts       *common.BitArray    `json:block_part`
 }
 
 // ---------  PeerState ---------
@@ -957,7 +973,8 @@ func (ps *PeerState) SetHasProposal(proposal *types.Proposal) {
 	}
 
 	ps.PRS.Proposal = true
-	ps.PRS.ProposalBlockHeader = proposal.Block.Header().Hash()
+	ps.PRS.ProposalBlockPartsHeader = proposal.BlockPartsHeader
+	ps.PRS.ProposalBlockParts = common.NewBitArray(proposal.BlockPartsHeader.Total)
 	ps.PRS.ProposalPOLRound = proposal.POLRound
 	ps.PRS.ProposalPOL = nil // Nil until ProposalPOLMessage received.
 }
@@ -1139,7 +1156,8 @@ func (ps *PeerState) ApplyNewRoundStepMessage(msg *NewRoundStepMessage) {
 	ps.PRS.StartTime = startTime
 	if !psHeight.Equals(msg.Height) || !psRound.Equals(msg.Round) {
 		ps.PRS.Proposal = false
-		ps.PRS.ProposalBlockHeader = cmn.Hash{}
+		ps.PRS.ProposalBlockPartsHeader = types.PartSetHeader{}
+		ps.PRS.ProposalBlockParts = nil
 		ps.PRS.ProposalPOLRound = cmn.NewBigInt32(-1)
 		ps.PRS.ProposalPOL = nil
 		// We'll update the BitArray capacity later.
@@ -1172,7 +1190,8 @@ func (ps *PeerState) ApplyCommitStepMessage(msg *CommitStepMessage) {
 		return
 	}
 
-	ps.PRS.ProposalBlockHeader = msg.Block.Header().Hash()
+	ps.PRS.ProposalBlockPartsHeader = msg.BlockPartsHeader
+	ps.PRS.ProposalBlockParts = msg.BlockParts
 }
 
 // ApplyHasVoteMessage updates the peer state for the new vote.

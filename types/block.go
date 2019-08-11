@@ -29,16 +29,28 @@ import (
 	"time"
 	"unsafe"
 
+	"math/big"
+
+	"github.com/kardiachain/go-kardia/consensus/types/help"
 	"github.com/kardiachain/go-kardia/lib/common"
 	"github.com/kardiachain/go-kardia/lib/crypto/sha3"
+	cdc "github.com/kardiachain/go-kardia/lib/go-amino"
 	"github.com/kardiachain/go-kardia/lib/log"
 	"github.com/kardiachain/go-kardia/lib/rlp"
 	"github.com/kardiachain/go-kardia/lib/trie"
-	"math/big"
+	"golang.org/x/crypto/ripemd160"
 )
 
 var (
 	EmptyRootHash = DeriveSha(Transactions{})
+	//ErrPartSetUnexpectedIndex is Error part set unexpected index
+	ErrPartSetUnexpectedIndex = errors.New("error part set unexpected index")
+	//ErrPartSetInvalidProof is Error part set invalid proof
+	ErrPartSetInvalidProof = errors.New("error part set invalid proof")
+)
+
+const (
+	MaxBlockBytes = 1048510 // lMB
 )
 
 //go:generate gencodec -type Header -field-override headerMarshaling -out gen_header_json.go
@@ -384,8 +396,8 @@ func (b *Block) SetLastCommit(c *Commit) {
 }
 
 func (b *Block) Header() *Header { return CopyHeader(b.header) }
-func (b *Block) HashesTo(id BlockID) bool {
-	return b.Hash().Equal(common.Hash(id))
+func (b *Block) HashesTo(hash common.Hash) bool {
+	return b.Hash().Equal(hash)
 }
 
 // Size returns the true RLP encoded storage size of the block, either by encoding
@@ -465,9 +477,9 @@ func (c *writeCounter) Write(b []byte) (int, error) {
 	return len(b), nil
 }
 
-func (b *Block) BlockID() BlockID {
-	return BlockID(b.Hash())
-}
+// func (b *Block) BlockID() BlockID {
+// 	return BlockID(b.Hash())
+// }
 
 // Hash returns the keccak256 hash of b's header.
 // The hash is computed on the first call and cached thereafter.
@@ -503,34 +515,36 @@ func (b *Block) MakeEmptyNil() {
 	}
 }
 
-type BlockID common.Hash
-
-func NewZeroBlockID() BlockID {
-	return BlockID{}
+type BlockID struct {
+	Hash        common.Hash   `json:"hash"`
+	PartsHeader PartSetHeader `json:"parts"`
 }
 
 func (b *BlockID) IsZero() bool {
-	zero := BlockID{}
-	return bytes.Equal(b[:], zero[:])
+	return len(b.Hash) == 0 && b.PartsHeader.IsZero()
 }
 
-func (b *BlockID) Equal(id BlockID) bool {
-	return common.Hash(*b).Equal(common.Hash(id))
+func (b *BlockID) Equal(bid BlockID) bool {
+	return common.Hash(b.Hash).Equal(bid.Hash)
 }
 
 // Key returns a machine-readable string representation of the BlockID
-func (blockID *BlockID) Key() string {
-	return string(blockID[:])
+func (b *BlockID) Key() string {
+	bz, err := cdc.MarshalBinaryBare(b.PartsHeader)
+	if err != nil {
+		panic(err)
+	}
+	return string(b.Hash.String()) + string(bz)
 }
 
 // String returns the first 12 characters of hex string representation of the BlockID
-func (blockID BlockID) String() string {
-	return common.Hash(blockID).Fingerprint()
+func (b BlockID) String() string {
+	return fmt.Sprintf(`%v:%v`, b.Hash, b.PartsHeader)
 }
 
-func (blockID BlockID) StringLong() string {
-	return common.Hash(blockID).Hex()
-}
+// func (b BlockID) StringLong() string {
+// 	return common.Hash(blockID).Hex()
+// }
 
 type Blocks []*Block
 
@@ -574,4 +588,316 @@ func DeriveSha(list DerivableList) common.Hash {
 	return t.Hash()
 
 	//return common.BytesToHash([]byte(""))
+}
+
+// Block Partitioning
+// Part struct
+type Part struct {
+	Index int              `json:"index"`
+	Bytes []byte           `json:"bytes"`
+	Proof help.SimpleProof `json:"proof"`
+
+	hash []byte
+}
+
+// Hash is part's hash
+func (p *Part) Hash() []byte {
+	if p.hash != nil {
+		return p.hash
+	}
+	hasher := ripemd160.New()
+	hasher.Write(p.Bytes) // nolint: errcheck, gas
+	p.hash = hasher.Sum(nil)
+	return p.hash
+}
+
+func (p *Part) String() string {
+	return p.StringIndented("")
+}
+
+// StringIndented indent's string
+func (p *Part) StringIndented(indent string) string {
+	return fmt.Sprintf(`Part{#%v
+	%s  Bytes: %X...
+	%s  Proof: %v
+	%s}`,
+		p.Index,
+		indent, common.Fingerprint(p.Bytes),
+		indent, "comment",
+		indent)
+}
+
+// PartSetHeader struct
+type PartSetHeader struct {
+	Total int    `json:"total"`
+	Hash  []byte `json:"hash"`
+}
+
+func (psh PartSetHeader) String() string {
+	return fmt.Sprintf("%v:%X", psh.Total, common.Fingerprint(psh.Hash))
+}
+
+// IsZero is have part
+func (psh PartSetHeader) IsZero() bool {
+	return psh.Total == 0
+}
+
+// Equals compare other partSet header's hash
+func (psh PartSetHeader) Equals(other PartSetHeader) bool {
+	return psh.Total == other.Total && bytes.Equal(psh.Hash, other.Hash)
+}
+
+// NewPartSetFromHeader Returns an empty PartSet ready to be populated.
+func NewPartSetFromHeader(header PartSetHeader) *PartSet {
+	return &PartSet{
+		total:         header.Total,
+		hash:          header.Hash,
+		parts:         make([]*Part, header.Total),
+		partsBitArray: common.NewBitArray(header.Total),
+		count:         0,
+	}
+}
+
+// PartSet struct
+type PartSet struct {
+	total int
+	hash  []byte
+
+	mtx           sync.Mutex
+	parts         []*Part
+	partsBitArray *common.BitArray
+	count         int
+}
+
+// NewPartSetFromData returns an immutable, full PartSet from the data bytes.
+// The data bytes are split into "partSize" chunks, and merkle tree computed.
+func NewPartSetFromData(data []byte, partSize uint) *PartSet {
+	// divide data into 4kb parts.
+	total := (len(data) + int(partSize) - 1) / int(partSize)
+	parts := make([]*Part, total)
+	partsBytes := make([][]byte, total)
+	partsBitArray := common.NewBitArray(total)
+	for i := 0; i < total; i++ {
+		part := &Part{
+			Index: i,
+			Bytes: data[i*int(partSize) : common.MinInt(len(data), (i+1)*int(partSize))],
+		}
+		parts[i] = part
+		partsBytes[i] = part.Bytes
+		partsBitArray.SetIndex(i, true)
+	}
+	// Compute merkle proofs
+	root, proofs := help.SimpleProofsFromByteSlices(partsBytes)
+	for i := 0; i < total; i++ {
+		parts[i].Proof = *proofs[i]
+	}
+	return &PartSet{
+		total:         total,
+		hash:          root,
+		parts:         parts,
+		partsBitArray: partsBitArray,
+		count:         total,
+	}
+}
+
+//Header get partSet's header
+func (ps *PartSet) Header() PartSetHeader {
+	if ps == nil {
+		return PartSetHeader{}
+	}
+	return PartSetHeader{
+		Total: ps.total,
+		Hash:  ps.hash,
+	}
+}
+
+//HasHeader Compare header
+func (ps *PartSet) HasHeader(header PartSetHeader) bool {
+	if ps == nil {
+		return false
+	}
+	return ps.Header().Equals(header)
+}
+
+//BitArray return BitArray's Copy
+func (ps *PartSet) BitArray() *common.BitArray {
+	ps.mtx.Lock()
+	defer ps.mtx.Unlock()
+	return ps.partsBitArray.Copy()
+}
+
+//Hash return ps'hash
+func (ps *PartSet) Hash() []byte {
+	if ps == nil {
+		return nil
+	}
+	return ps.hash
+}
+
+//HashesTo Compare two hashes
+func (ps *PartSet) HashesTo(hash []byte) bool {
+	if ps == nil {
+		return false
+	}
+	return bytes.Equal(ps.hash, hash)
+}
+
+//Count Count of parts
+func (ps *PartSet) Count() int {
+	if ps == nil {
+		return 0
+	}
+	return ps.count
+}
+
+//Total sum of parts
+func (ps *PartSet) Total() int {
+	if ps == nil {
+		return 0
+	}
+	return ps.total
+}
+
+//AddPart add a part to parts array
+func (ps *PartSet) AddPart(part *Part) (bool, error) {
+	ps.mtx.Lock()
+	defer ps.mtx.Unlock()
+
+	// Invalid part index
+	if part.Index >= ps.total {
+		return false, ErrPartSetUnexpectedIndex
+	}
+
+	// If part already exists, return false.
+	if ps.parts[part.Index] != nil {
+		return false, nil
+	}
+	// Check hash proof
+	if part.Proof.Verify(ps.Hash(), part.Hash()) != nil {
+		return false, ErrPartSetInvalidProof
+	}
+	// Add part
+	ps.parts[part.Index] = part
+	ps.partsBitArray.SetIndex(part.Index, true)
+	ps.count++
+	return true, nil
+}
+
+//GetPart get a part for index
+func (ps *PartSet) GetPart(index uint) *Part {
+	ps.mtx.Lock()
+	defer ps.mtx.Unlock()
+	return ps.parts[index]
+}
+
+//IsComplete if get all part
+func (ps *PartSet) IsComplete() bool {
+	return ps.count == ps.total
+}
+
+//GetReader get a new reader if not complete
+func (ps *PartSet) GetReader() io.Reader {
+	if !ps.IsComplete() {
+		help.PanicSanity("Cannot GetReader() on incomplete PartSet")
+	}
+	return NewPartSetReader(ps.parts)
+}
+
+//StringShort print partSet count and total
+func (ps *PartSet) StringShort() string {
+	if ps == nil {
+		return "nil-PartSet"
+	}
+	ps.mtx.Lock()
+	defer ps.mtx.Unlock()
+	return fmt.Sprintf("(%v of %v)", ps.Count(), ps.Total())
+}
+
+//MarshalJSON is marshal partsBitArray to json
+func (ps *PartSet) MarshalJSON() ([]byte, error) {
+	if ps == nil {
+		return []byte("{}"), nil
+	}
+
+	ps.mtx.Lock()
+	defer ps.mtx.Unlock()
+
+	return cdc.MarshalJSON(struct {
+		CountTotal    string           `json:"count/total"`
+		PartsBitArray *common.BitArray `json:"parts_bit_array"`
+	}{
+		fmt.Sprintf("%d/%d", ps.Count(), ps.Total()),
+		ps.partsBitArray,
+	})
+}
+
+//MakePartSet block to partset
+func MakePartSet(partSize uint, block *Block) (*PartSet, error) {
+	// We prefix the byte length, so that unmarshaling
+	// can easily happen via a reader.
+	bzs, err := rlp.EncodeToBytes(block)
+	if err != nil {
+		panic(err)
+	}
+	bz, err := cdc.MarshalBinary(bzs)
+	if err != nil {
+		return nil, err
+	}
+	return NewPartSetFromData(bz, partSize), nil
+}
+
+//MakeBlockFromPartSet partSet to block
+func MakeBlockFromPartSet(reader *PartSet) (*Block, error) {
+	if reader.IsComplete() {
+		maxsize := int64(MaxBlockBytes)
+		b := make([]byte, maxsize, maxsize)
+		_, err := cdc.UnmarshalBinaryReader(reader.GetReader(), &b, maxsize)
+		if err != nil {
+			return nil, err
+		}
+		var block Block
+		if err = rlp.DecodeBytes(b, &block); err != nil {
+			return nil, err
+		}
+		return &block, nil
+	}
+	return nil, errors.New("not complete")
+}
+
+// PartSetReader struct
+type PartSetReader struct {
+	i      int
+	parts  []*Part
+	reader *bytes.Reader
+}
+
+//NewPartSetReader return new reader
+func NewPartSetReader(parts []*Part) *PartSetReader {
+	return &PartSetReader{
+		i:      0,
+		parts:  parts,
+		reader: bytes.NewReader(parts[0].Bytes),
+	}
+}
+
+//Read  read a partSet bytes
+func (psr *PartSetReader) Read(p []byte) (n int, err error) {
+	readerLen := psr.reader.Len()
+	if readerLen >= len(p) {
+		return psr.reader.Read(p)
+	} else if readerLen > 0 {
+		n1, err := psr.Read(p[:readerLen])
+		if err != nil {
+			return n1, err
+		}
+		n2, err := psr.Read(p[readerLen:])
+		return n1 + n2, err
+	}
+
+	psr.i++
+	if psr.i >= len(psr.parts) {
+		return 0, io.EOF
+	}
+	psr.reader = bytes.NewReader(psr.parts[psr.i].Bytes)
+	return psr.Read(p)
 }
