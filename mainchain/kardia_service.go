@@ -132,7 +132,7 @@ func newKardiaService(ctx *node.ServiceContext, config *Config) (*KardiaService,
 	state := state.LastestBlockState{
 		ChainID:                     "kaicon", // TODO(thientn): considers merging this with protocolmanger.ChainID
 		LastBlockHeight:             cmn.NewBigUint64(block.Height()),
-		LastBlockID:                 block.BlockID(),
+		LastBlockID:                 types.BlockID{Hash: block.Hash()},
 		LastBlockTime:               block.Time(),
 		Validators:                  validatorSet,
 		LastValidators:              validatorSet,
