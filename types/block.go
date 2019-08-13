@@ -660,6 +660,11 @@ func NewPartSetFromHeader(header PartSetHeader) *PartSet {
 	}
 }
 
+// ZeroPartSetHeader return nil PartSetHeader
+func IsZeroPartSetHeader() PartSetHeader {
+	return PartSetHeader{}
+}
+
 // PartSet struct
 type PartSet struct {
 	total int
