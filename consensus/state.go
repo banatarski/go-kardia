@@ -251,10 +251,13 @@ func (cs *ConsensusState) updateToState(state state.LastestBlockState) {
 	cs.Validators = validators
 	cs.Proposal = nil
 	cs.ProposalBlock = nil
+	cs.ProposalBlockParts = nil
 	cs.LockedRound = cmn.NewBigInt32(0)
 	cs.LockedBlock = nil
+	cs.LockedBlockParts = nil
 	cs.ValidRound = cmn.NewBigInt32(0)
 	cs.ValidBlock = nil
+	cs.ValidBlockParts = nil
 	cs.Votes = cstypes.NewHeightVoteSet(cs.logger, state.ChainID, height, validators)
 	cs.CommitRound = cmn.NewBigInt32(-1)
 	cs.LastCommit = lastPrecommits
@@ -288,6 +291,7 @@ func (cs *ConsensusState) AddVote(vote *types.Vote, peerID discover.NodeID) (add
 func (cs *ConsensusState) decideProposal(height *cmn.BigInt, round *cmn.BigInt) {
 	var block *types.Block
 	var blockParts *types.PartSet
+	var err error
 
 	// Decide on block
 	if cs.LockedBlock != nil {
@@ -299,9 +303,9 @@ func (cs *ConsensusState) decideProposal(height *cmn.BigInt, round *cmn.BigInt) 
 	} else {
 		// Create a new proposal block from state/txs from the mempool.
 		// Decide on block
-		block = cs.createProposalBlock()
-		if block == nil { // on error
-			cs.logger.Trace("Create proposal block failed")
+		block, blockParts, err = cs.createProposalBlock()
+		if err != nil || block == nil { // on error
+			cs.logger.Trace("Create proposal block failed", "height", height, "error", err)
 			return
 		}
 	}
@@ -1180,7 +1184,7 @@ func (cs *ConsensusState) finalizeCommit(height *cmn.BigInt) {
 		precommits := cs.Votes.Precommits(cs.CommitRound.Int32())
 		seenCommit := precommits.MakeCommit()
 		cs.logger.Trace("Save new block", "block", block, "seenCommit", seenCommit)
-		cs.blockOperations.SaveBlock(block, seenCommit)
+		cs.blockOperations.SaveBlock(block, seenCommit, blockParts, cs.Proposal)
 	} else {
 		// Happens during replay if we already saved the block but didn't commit
 		cs.logger.Info("Calling finalizeCommit on already stored block", "height", block.Height())
@@ -1223,7 +1227,7 @@ func (cs *ConsensusState) finalizeCommit(height *cmn.BigInt) {
 
 // Creates the next block to propose and returns it. Returns nil block upon
 // error.
-func (cs *ConsensusState) createProposalBlock() (block *types.Block) {
+func (cs *ConsensusState) createProposalBlock() (block *types.Block, blockParts *types.PartSet, err error) {
 	cs.logger.Trace("createProposalBlock")
 	var commit *types.Commit
 	if cs.Height.EqualsInt(1) {
@@ -1237,7 +1241,7 @@ func (cs *ConsensusState) createProposalBlock() (block *types.Block) {
 	} else {
 		// This shouldn't happen.
 		cs.logger.Error("enterPropose: Cannot propose anything: No commit for the previous block.")
-		return nil
+		return nil, nil, nil
 	}
 
 	return cs.blockOperations.CreateProposalBlock(cs.Height.Int64(), cs.state.LastBlockID, cs.state.LastValidators.Hash(), commit)

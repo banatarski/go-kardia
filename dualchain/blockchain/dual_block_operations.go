@@ -70,7 +70,8 @@ func (dbo *DualBlockOperations) Height() uint64 {
 }
 
 // Proposes a new block for dual's blockchain.
-func (dbo *DualBlockOperations) CreateProposalBlock(height int64, lastBlockID types.BlockID, lastValidatorHash common.Hash, commit *types.Commit) (block *types.Block) {
+func (dbo *DualBlockOperations) CreateProposalBlock(height int64, lastBlockID types.BlockID, lastValidatorHash common.Hash,
+	commit *types.Commit) (block *types.Block, blockParts *types.PartSet, err error) {
 	// Gets all dual's events in pending pools and them to the new block.
 	// TODO(namdoh@): Since there may be a small latency for other dual peers to see the same set of
 	// dual's events, we may need to wait a bit here.
@@ -83,7 +84,7 @@ func (dbo *DualBlockOperations) CreateProposalBlock(height int64, lastBlockID ty
 	stateRoot, err := dbo.commitDualEvents(events)
 	if err != nil {
 		dbo.logger.Error("Fail to commit dual's events", "err", err)
-		return nil
+		return nil, nil, nil
 	}
 	header.Root = stateRoot
 
@@ -91,7 +92,7 @@ func (dbo *DualBlockOperations) CreateProposalBlock(height int64, lastBlockID ty
 		previousBlock := dbo.blockchain.GetBlockByHeight(uint64(height) - 1)
 		if previousBlock == nil {
 			dbo.logger.Error("Get previous block N-1 failed", "proposedHeight", height)
-			return nil
+			return nil, nil, nil
 		}
 		// TODO(#169,namdoh): Break this propose step into two passes--first is to propose
 		// pending DualEvents, second is to propose submission receipts of N-1 DualEvent-derived Txs
@@ -100,15 +101,16 @@ func (dbo *DualBlockOperations) CreateProposalBlock(height int64, lastBlockID ty
 		_, err := dbo.submitDualEvents(previousBlock.DualEvents())
 		if err != nil {
 			dbo.logger.Error("Fail to submit dual events", "err", err)
-			return nil
+			return nil, nil, nil
 		}
 		dbo.logger.Info("Not yet implemented - Update state root with the DualEvent's submission receipt")
 	}
 
 	block = dbo.newBlock(header, events, commit)
+	blockParts, err = types.MakePartSet(types.BlockPartSizeBytes, block)
 	dbo.logger.Trace("Make block to propose", "block", block)
 
-	return block
+	return block, blockParts, err
 }
 
 // Executes and commits the new state from events in the given block.
@@ -140,7 +142,7 @@ func (dbo *DualBlockOperations) CommitBlockTxsIfNotFound(block *types.Block) err
 //             If all the nodes restart after committing a block,
 //             we need this to reload the precommits to catch-up nodes to the
 //             most recent height.  Otherwise they'd stall at H-1.
-func (dbo *DualBlockOperations) SaveBlock(block *types.Block, seenCommit *types.Commit) {
+func (dbo *DualBlockOperations) SaveBlock(block *types.Block, seenCommit *types.Commit, blockParts *types.PartSet, proposal *types.Proposal) {
 	if block == nil {
 		common.PanicSanity("DualBlockOperations try to save a nil block")
 	}

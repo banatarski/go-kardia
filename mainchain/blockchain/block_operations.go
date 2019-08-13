@@ -61,7 +61,7 @@ func (bo *BlockOperations) Height() uint64 {
 
 // CreateProposalBlock creates a new proposal block with all current pending txs in pool.
 func (bo *BlockOperations) CreateProposalBlock(height int64, lastBlockID types.BlockID,
-	lastValidatorHash common.Hash, commit *types.Commit) (block *types.Block) {
+	lastValidatorHash common.Hash, commit *types.Commit) (block *types.Block, blockParts *types.PartSet, err error) {
 	// Gets all transactions in pending pools and execute them to get new account states.
 	// Tx execution can happen in parallel with voting or precommitted.
 	// For simplicity, this code executes & commits txs before sending proposal,
@@ -76,16 +76,17 @@ func (bo *BlockOperations) CreateProposalBlock(height int64, lastBlockID types.B
 	stateRoot, receipts, err := bo.commitTransactions(txs, header)
 	if err != nil {
 		bo.logger.Error("Fail to commit transactions", "err", err)
-		return nil
+		return nil, nil, nil
 	}
 	header.Root = stateRoot
 
 	block = bo.newBlock(header, txs, receipts, commit)
-	bo.logger.Trace("Make block to propose", "block", block)
+	blockParts, err = types.MakePartSet(types.BlockPartSizeBytes, block)
+	bo.logger.Trace("Make block to propose", "block", block, "blockParts", blockParts)
 
 	bo.saveReceipts(receipts, block)
 
-	return block
+	return block, blockParts, err
 }
 
 // CommitAndValidateBlockTxs executes and commits the transactions in the given block.
@@ -124,7 +125,7 @@ func (bo *BlockOperations) CommitBlockTxsIfNotFound(block *types.Block) error {
 //             If all the nodes restart after committing a block,
 //             we need this to reload the precommits to catch-up nodes to the
 //             most recent height.  Otherwise they'd stall at H-1.
-func (bo *BlockOperations) SaveBlock(block *types.Block, seenCommit *types.Commit) {
+func (bo *BlockOperations) SaveBlock(block *types.Block, seenCommit *types.Commit, blockParts *types.PartSet, proposal *types.Proposal) {
 	if block == nil {
 		common.PanicSanity("BlockOperations try to save a nil block")
 	}

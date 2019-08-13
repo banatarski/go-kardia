@@ -50,7 +50,9 @@ var (
 )
 
 const (
-	MaxBlockBytes = 1048510 // lMB
+	MaxLimitBlockStore      = 200
+	MaxBlockBytes           = 1048510 // lMB
+	BlockPartSizeBytes uint = 65536
 )
 
 //go:generate gencodec -type Header -field-override headerMarshaling -out gen_header_json.go
@@ -880,7 +882,7 @@ func NewPartSetReader(parts []*Part) *PartSetReader {
 	}
 }
 
-//Read  read a partSet bytes
+//Read read a partSet bytes
 func (psr *PartSetReader) Read(p []byte) (n int, err error) {
 	readerLen := psr.reader.Len()
 	if readerLen >= len(p) {
@@ -900,4 +902,93 @@ func (psr *PartSetReader) Read(p []byte) (n int, err error) {
 	}
 	psr.reader = bytes.NewReader(psr.parts[psr.i].Bytes)
 	return psr.Read(p)
+}
+
+//-------------------------------------------------------
+
+//BlockMeta struct
+type BlockMeta struct {
+	Block      *Block
+	BlockID    *BlockID
+	BlockPacks *PartSet
+	SeenCommit *Commit
+	Proposal   *Proposal
+}
+
+//BlockStore struct
+type BlockStore struct {
+	blocks    map[uint64]*BlockMeta
+	blockLock *sync.Mutex
+}
+
+// NewBlockStore warning all function not thread_safe
+func NewBlockStore() *BlockStore {
+	return &BlockStore{
+		blocks:    make(map[uint64]*BlockMeta),
+		blockLock: new(sync.Mutex),
+	}
+}
+
+//LoadBlockMeta load BlockMeta with height
+func (b *BlockStore) LoadBlockMeta(height uint64) *BlockMeta {
+	b.blockLock.Lock()
+	defer b.blockLock.Unlock()
+
+	if v, ok := b.blocks[height]; ok {
+		return v
+	}
+	return nil
+}
+
+//LoadBlockPart load block part with height and index
+func (b *BlockStore) LoadBlockPart(height uint64, index uint) *Part {
+	b.blockLock.Lock()
+	defer b.blockLock.Unlock()
+
+	if v, ok := b.blocks[height]; ok {
+		return v.BlockPacks.GetPart(index)
+	}
+	return nil
+}
+
+//MaxBlockHeight get max fast block height
+func (b *BlockStore) MaxBlockHeight() uint64 {
+	b.blockLock.Lock()
+	defer b.blockLock.Unlock()
+	var cur uint64 = 0
+	//var fb *ctypes.Block = nil
+	for k := range b.blocks {
+		if cur == 0 {
+			cur = k
+		}
+		if cur < k {
+			cur = k
+		}
+	}
+	return cur
+}
+
+//MinBlockHeight get min fast block height
+func (b *BlockStore) MinBlockHeight() uint64 {
+	var cur uint64
+	for k := range b.blocks {
+		if cur == 0 {
+			cur = k
+		}
+		if cur > k {
+			cur = k
+		}
+	}
+	return cur
+}
+
+//LoadBlockCommit is load blocks commit vote
+func (b *BlockStore) LoadBlockCommit(height uint64) *Commit {
+	b.blockLock.Lock()
+	defer b.blockLock.Unlock()
+
+	if v, ok := b.blocks[height]; ok {
+		return v.SeenCommit
+	}
+	return nil
 }
