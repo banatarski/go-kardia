@@ -417,7 +417,7 @@ func (cs *ConsensusState) reconstructLastCommit(state state.LastestBlockState) {
 // NOTE: block is not necessarily valid.
 // Asynchronously triggers either enterPrevote (before we timeout of propose) or tryFinalizeCommit, once we have the full block.
 func (cs *ConsensusState) handleBlockPartMessage(msg *BlockPartMessage, peerID discover.NodeID) (added bool, err error) {
-	cs.logger.Trace("setProposalBlock", "msg", msg.String(), "peerID", peerID)
+	cs.logger.Trace("setProposalBlockPart", "msg", msg.String(), "peerID", peerID)
 
 	// Blocks might be reused, so round mismatch is OK
 	if !cs.Height.Equals(msg.Height) {
@@ -425,10 +425,10 @@ func (cs *ConsensusState) handleBlockPartMessage(msg *BlockPartMessage, peerID d
 		return false, nil
 	}
 
-	return cs.setProposalBlockPart(msg)
+	return cs.addProposalBlockPart(msg)
 }
 
-func (cs *ConsensusState) setProposalBlockPart(msg *BlockPartMessage) (added bool, err error) {
+func (cs *ConsensusState) addProposalBlockPart(msg *BlockPartMessage) (added bool, err error) {
 	height, round, part := msg.Height, msg.Round, msg.Part
 	// NOTE: it's possible to receive complete proposal blocks for future rounds without having the proposal
 	cs.logger.Info("Received complete proposal block part", "height", cs.ProposalBlock.Height(), "hash", cs.ProposalBlock.Hash())
@@ -454,14 +454,13 @@ func (cs *ConsensusState) setProposalBlockPart(msg *BlockPartMessage) (added boo
 	}
 
 	if added && cs.ProposalBlockParts.IsComplete() {
-		// If block parts added and completed
+		// If block parts added and completed, encode it
 		cs.ProposalBlock, err = types.MakeBlockFromPartSet(cs.ProposalBlockParts)
 		if err != nil {
 			return true, err
 		}
 		// NOTE: it's possible to receive complete proposal blocks for future rounds without having the proposal
 		log.Debug("Received complete proposal block", "height", cs.ProposalBlock.Height(), "hash", cs.ProposalBlock.Hash())
-
 		// Update Valid* if we can.
 		prevotes := cs.Votes.Prevotes(cs.Round.Int32())
 		blockID, hasTwoThirds := prevotes.TwoThirdsMajority()
@@ -1392,7 +1391,7 @@ func (cs *ConsensusState) handleMsg(mi msgInfo) {
 		err = cs.setProposal(msg.Proposal)
 	case *BlockPartMessage:
 		// if the proposal is complete, we'll enterPrevote or tryFinalizeCommit
-		_, err = cs.setProposalBlockPart(msg)
+		_, err = cs.addProposalBlockPart(msg)
 		if err != nil && msg.Round != cs.Round {
 			log.Trace("Received block part from wrong round", "height", cs.Height, "csRound", cs.Round, "blockRound", msg.Round)
 			err = nil

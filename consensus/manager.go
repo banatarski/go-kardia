@@ -191,9 +191,10 @@ func (conR *ConsensusManager) ReceiveNewProposal(generalMsg p2p.Msg, src *p2p.Pe
 		conR.logger.Error("Invalid proposal message", "msg", generalMsg, "err", err)
 		return
 	}
+
 	// msg.Proposal.Block.SetLogger(conR.logger)
 
-	// TODO @luu: include this again
+	// // TODO @luu: include this again
 	// conR.logger.Trace("Decoded msg", "msg", msg.Proposal)
 	// if msg.Proposal.Block.LastCommit() == nil {
 	// 	msg.Proposal.Block.SetLastCommit(&types.Commit{})
@@ -513,7 +514,7 @@ func makeRoundStepMessages(rs *cstypes.RoundState) (nrsMsg *NewRoundStepMessage,
 		SecondsSinceStartTime: uint(time.Now().Unix() - rs.StartTime.Int64()),
 		LastCommitRound:       rs.LastCommit.Round(),
 	}
-	if rs.Step == cstypes.RoundStepCommit && rs.ProposalBlock != nil {
+	if rs.Step == cstypes.RoundStepCommit && rs.ProposalBlockParts != nil {
 		csMsg = &CommitStepMessage{
 			Height:           rs.Height,
 			BlockPartsHeader: rs.ProposalBlockParts.Header(),
@@ -537,6 +538,25 @@ OUTER_LOOP:
 		}
 		rs := conR.conS.GetRoundState()
 		prs := ps.GetRoundState()
+
+		// Start sending proposal block parts
+		if rs.ProposalBlockParts != nil && rs.ProposalBlockParts.HasHeader(prs.ProposalBlockPartsHeader) {
+			if index, ok := rs.ProposalBlockParts.BitArray().Sub(prs.ProposalBlockParts.Copy()).PickRandom(); ok {
+				part := rs.ProposalBlockParts.GetPart(uint(index))
+				if part != nil {
+					msg := &BlockPartMessage{
+						Height: rs.Height, // This tells peer that this part applies to us.
+						Round:  rs.Round,  // This tells peer that this part applies to us.
+						Part:   part,
+					}
+					log.Trace("Sending block part", "height", prs.Height, "round", prs.Round)
+					if err := p2p.Send(ps.rw, service.CsProposalMsg, msg); err != nil {
+						ps.SetHasProposalBlockPart(prs.Height, prs.Round, index)
+					}
+					continue OUTER_LOOP
+				}
+			}
+		}
 
 		// If the peer is on a previous height, help catch up.
 		if prs.Height.IsGreaterThanInt(0) && prs.Height.IsLessThan(rs.Height) {
@@ -908,9 +928,14 @@ func (m *VoteSetBitsMessage) String() string {
 
 // CommitStepMessage is sent when a block is committed.
 type CommitStepMessage struct {
-	Height           *cmn.BigInt         `json:"height" gencodoc:"required"`
-	BlockPartsHeader types.PartSetHeader `json:part_set_header`
-	BlockParts       *common.BitArray    `json:block_part`
+	Height           *cmn.BigInt
+	BlockPartsHeader types.PartSetHeader
+	BlockParts       *common.BitArray
+}
+
+// String returns a string representation.
+func (m *CommitStepMessage) String() string {
+	return fmt.Sprintf("[CommitStep H:%v BP:%v BA:%v]", m.Height, m.BlockPartsHeader, m.BlockParts)
 }
 
 // ---------  PeerState ---------
@@ -977,6 +1002,18 @@ func (ps *PeerState) SetHasProposal(proposal *types.Proposal) {
 	ps.PRS.ProposalBlockParts = common.NewBitArray(proposal.BlockPartsHeader.Total)
 	ps.PRS.ProposalPOLRound = proposal.POLRound
 	ps.PRS.ProposalPOL = nil // Nil until ProposalPOLMessage received.
+}
+
+// SetHasProposalBlockPart sets the given block part index as known for the peer.
+func (ps *PeerState) SetHasProposalBlockPart(height *cmn.BigInt, round *cmn.BigInt, index int) {
+	ps.mtx.Lock()
+	defer ps.mtx.Unlock()
+
+	if ps.PRS.Height.Equals(height) || ps.PRS.Round.Equals(round) {
+		return
+	}
+
+	ps.PRS.ProposalBlockParts.SetIndex(index, true)
 }
 
 // PickSendVote picks a vote and sends it to the peer.
