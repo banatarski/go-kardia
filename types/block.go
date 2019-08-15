@@ -38,7 +38,6 @@ import (
 	"github.com/kardiachain/go-kardia/lib/log"
 	"github.com/kardiachain/go-kardia/lib/rlp"
 	"github.com/kardiachain/go-kardia/lib/trie"
-	"golang.org/x/crypto/ripemd160"
 )
 
 var (
@@ -479,10 +478,6 @@ func (c *writeCounter) Write(b []byte) (int, error) {
 	return len(b), nil
 }
 
-// func (b *Block) BlockID() BlockID {
-// 	return BlockID(b.Hash())
-// }
-
 // Hash returns the keccak256 hash of b's header.
 // The hash is computed on the first call and cached thereafter.
 func (b *Block) Hash() common.Hash {
@@ -593,6 +588,7 @@ func DeriveSha(list DerivableList) common.Hash {
 }
 
 // Block Partitioning
+
 // Part struct
 type Part struct {
 	Index int              `json:"index"`
@@ -607,9 +603,8 @@ func (p *Part) Hash() []byte {
 	if p.hash != nil {
 		return p.hash
 	}
-	hasher := ripemd160.New()
-	hasher.Write(p.Bytes) // nolint: errcheck, gas
-	p.hash = hasher.Sum(nil)
+	tmp := rlpHash(p.Bytes)
+	p.hash = tmp[:]
 	return p.hash
 }
 
@@ -660,8 +655,8 @@ func NewPartSetFromHeader(header PartSetHeader) *PartSet {
 	}
 }
 
-// ZeroPartSetHeader return nil PartSetHeader
-func IsZeroPartSetHeader() PartSetHeader {
+// NilPartSetHeader return nil PartSetHeader
+func NilPartSetHeader() PartSetHeader {
 	return PartSetHeader{}
 }
 
@@ -907,93 +902,4 @@ func (psr *PartSetReader) Read(p []byte) (n int, err error) {
 	}
 	psr.reader = bytes.NewReader(psr.parts[psr.i].Bytes)
 	return psr.Read(p)
-}
-
-//-------------------------------------------------------
-
-//BlockMeta struct
-type BlockMeta struct {
-	Block      *Block
-	BlockID    *BlockID
-	BlockPacks *PartSet
-	SeenCommit *Commit
-	Proposal   *Proposal
-}
-
-//BlockStore struct
-type BlockStore struct {
-	blocks    map[uint64]*BlockMeta
-	blockLock *sync.Mutex
-}
-
-// NewBlockStore warning all function not thread_safe
-func NewBlockStore() *BlockStore {
-	return &BlockStore{
-		blocks:    make(map[uint64]*BlockMeta),
-		blockLock: new(sync.Mutex),
-	}
-}
-
-//LoadBlockMeta load BlockMeta with height
-func (b *BlockStore) LoadBlockMeta(height uint64) *BlockMeta {
-	b.blockLock.Lock()
-	defer b.blockLock.Unlock()
-
-	if v, ok := b.blocks[height]; ok {
-		return v
-	}
-	return nil
-}
-
-//LoadBlockPart load block part with height and index
-func (b *BlockStore) LoadBlockPart(height uint64, index uint) *Part {
-	b.blockLock.Lock()
-	defer b.blockLock.Unlock()
-
-	if v, ok := b.blocks[height]; ok {
-		return v.BlockPacks.GetPart(index)
-	}
-	return nil
-}
-
-//MaxBlockHeight get max fast block height
-func (b *BlockStore) MaxBlockHeight() uint64 {
-	b.blockLock.Lock()
-	defer b.blockLock.Unlock()
-	var cur uint64 = 0
-	//var fb *ctypes.Block = nil
-	for k := range b.blocks {
-		if cur == 0 {
-			cur = k
-		}
-		if cur < k {
-			cur = k
-		}
-	}
-	return cur
-}
-
-//MinBlockHeight get min fast block height
-func (b *BlockStore) MinBlockHeight() uint64 {
-	var cur uint64
-	for k := range b.blocks {
-		if cur == 0 {
-			cur = k
-		}
-		if cur > k {
-			cur = k
-		}
-	}
-	return cur
-}
-
-//LoadBlockCommit is load blocks commit vote
-func (b *BlockStore) LoadBlockCommit(height uint64) *Commit {
-	b.blockLock.Lock()
-	defer b.blockLock.Unlock()
-
-	if v, ok := b.blocks[height]; ok {
-		return v.SeenCommit
-	}
-	return nil
 }

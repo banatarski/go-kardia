@@ -231,6 +231,25 @@ func (conR *ConsensusManager) ReceiveBlock(generalMsg p2p.Msg, src *p2p.Peer) {
 	conR.conS.peerMsgQueue <- msgInfo{&msg, src.ID()}
 }
 
+func (conR *ConsensusManager) ReceiveBlockPart(generalMsg p2p.Msg, src *p2p.Peer) {
+	conR.logger.Trace("Consensus manager received block part", "peer", src)
+
+	if !conR.running {
+		conR.logger.Trace("Consensus manager isn't running.")
+		return
+	}
+
+	var msg BlockPartMessage
+	if err := generalMsg.Decode(&msg); err != nil {
+		conR.logger.Error("Invalid BlockPartMessage", "msg", generalMsg, "err", err)
+		return
+	}
+
+	conR.logger.Trace("Decoded msg", "msg", fmt.Sprintf("Height:%v   Round:%v   BlockPart:%v", msg.Height, msg.Round))
+
+	conR.conS.peerMsgQueue <- msgInfo{&msg, src.ID()}
+}
+
 func (conR *ConsensusManager) ReceiveNewVote(generalMsg p2p.Msg, src *p2p.Peer) {
 	conR.logger.Trace("Consensus manager received NewVote", "peer", src)
 
@@ -1002,6 +1021,19 @@ func (ps *PeerState) SetHasProposal(proposal *types.Proposal) {
 	ps.PRS.ProposalBlockParts = common.NewBitArray(proposal.BlockPartsHeader.Total)
 	ps.PRS.ProposalPOLRound = proposal.POLRound
 	ps.PRS.ProposalPOL = nil // Nil until ProposalPOLMessage received.
+}
+
+// InitProposalBlockParts initializes the peer's proposal block parts header and bit array.
+func (ps *PeerState) InitProposalBlockParts(partsHeader types.PartSetHeader) {
+	ps.mtx.Lock()
+	defer ps.mtx.Unlock()
+
+	if ps.PRS.ProposalBlockParts != nil {
+		return
+	}
+
+	ps.PRS.ProposalBlockPartsHeader = partsHeader
+	ps.PRS.ProposalBlockParts = cmn.NewBitArray(partsHeader.Total)
 }
 
 // SetHasProposalBlockPart sets the given block part index as known for the peer.

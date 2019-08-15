@@ -85,8 +85,8 @@ func WriteChainConfig(db DatabaseWriter, hash common.Hash, cfg *configs.ChainCon
 
 // WriteBlock serializes a block into the database, header and body separately.
 func WriteBlock(db DatabaseWriter, block *types.Block) {
-	WriteBody(db, block.Hash(), block.Height(), block.Body())
 	WriteHeader(db, block.Header())
+	WriteBody(db, block.Hash(), block.Height(), block.Body())
 }
 
 // WriteBody stores a block body into the database.

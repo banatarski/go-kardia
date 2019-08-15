@@ -352,6 +352,9 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 	case msg.Code == serviceconst.CsBlockMsg:
 		pm.logger.Trace("Block message received")
 		pm.csReactor.ReceiveBlock(msg, p.Peer)
+	case msg.Code == serviceconst.CsBlockPartMsg:
+		pm.logger.Trace("BlockPart message received")
+		pm.csReactor.ReceiveBlockPart(msg, p.Peer)
 	case msg.Code == serviceconst.CsVoteSetMaj23Message:
 		pm.logger.Trace("VoteSetMaj23 message received")
 		pm.csReactor.ReceiveVoteSetMaj23(msg, p.Peer)

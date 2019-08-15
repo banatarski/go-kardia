@@ -21,6 +21,9 @@ package genesis
 import (
 	"errors"
 	"fmt"
+	"math"
+	"math/big"
+
 	"github.com/kardiachain/go-kardia/configs"
 	"github.com/kardiachain/go-kardia/kai/chaindb"
 	"github.com/kardiachain/go-kardia/kai/state"
@@ -28,8 +31,6 @@ import (
 	"github.com/kardiachain/go-kardia/lib/common"
 	"github.com/kardiachain/go-kardia/lib/log"
 	"github.com/kardiachain/go-kardia/types"
-	"math"
-	"math/big"
 )
 
 //go:generate gencodec -type Genesis -field-override genesisSpecMarshaling -out gen_genesis.go
@@ -155,8 +156,7 @@ func (g *Genesis) ToBlock(logger log.Logger, db kaidb.Database) *types.Block {
 	}
 	root := statedb.IntermediateRoot(false)
 	head := &types.Header{
-		//@huny: convert timestamp here
-		// Time:           g.Timestamp,
+		Time:     new(big.Int).SetUint64(g.Timestamp),
 		GasLimit: g.GasLimit,
 		Root:     root,
 	}
@@ -272,7 +272,6 @@ func GenesisAllocFromAccountAndContract(accountData map[string]*big.Int, contrac
 	}
 	return ga, nil
 }
-
 
 // ToCell converts KAI to CELL. eg: amount * 10^18
 func ToCell(amount int64) *big.Int {
