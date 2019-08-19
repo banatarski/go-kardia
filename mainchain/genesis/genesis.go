@@ -176,6 +176,7 @@ func (g *Genesis) Commit(logger log.Logger, db kaidb.Database) (*types.Block, er
 	if block.Height() != 0 {
 		return nil, fmt.Errorf("can't commit genesis block with height > 0")
 	}
+
 	chaindb.WriteBlock(db, block)
 	chaindb.WriteReceipts(db, block.Hash(), block.Height(), nil)
 	chaindb.WriteCanonicalHash(db, block.Hash(), block.Height())
