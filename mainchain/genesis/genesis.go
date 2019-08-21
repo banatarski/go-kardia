@@ -156,7 +156,7 @@ func (g *Genesis) ToBlock(logger log.Logger, db kaidb.Database) *types.Block {
 	}
 	root := statedb.IntermediateRoot(false)
 	head := &types.Header{
-		Time:     new(big.Int).SetUint64(g.Timestamp),
+		// Time:     new(big.Int).SetUint64(g.Timestamp),
 		GasLimit: g.GasLimit,
 		Root:     root,
 	}

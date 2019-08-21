@@ -119,6 +119,7 @@ func WriteHeader(db DatabaseWriter, header *types.Header) {
 		log.Crit("Failed to store hash to height mapping", "err", err)
 	}
 	// Write the encoded header
+	log.Warn("Header", header.StringLong())
 	data, err := rlp.EncodeToBytes(header)
 	if err != nil {
 		log.Crit("Failed to RLP encode header", "err", err)

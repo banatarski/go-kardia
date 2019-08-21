@@ -1236,7 +1236,7 @@ func (cs *ConsensusState) finalizeCommit(height *cmn.BigInt) {
 	// Execute and commit the block, update and save the state, and update the mempool.
 	// NOTE The block.AppHash wont reflect these txs until the next block.
 	var err error
-	stateCopy, err = state.ApplyBlock(cs.logger, stateCopy, blockID, block)
+	stateCopy, err = state.ApplyBlock(cs.logger, stateCopy, blockID.Hash, block)
 	if err != nil {
 		cs.logger.Error("Error on ApplyBlock. Did the application crash? Please restart node", "err", err)
 		err := cmn.Kill()
@@ -1282,7 +1282,7 @@ func (cs *ConsensusState) createProposalBlock() (block *types.Block, blockParts 
 		return nil, nil, nil
 	}
 
-	return cs.blockOperations.CreateProposalBlock(cs.Height.Int64(), cs.state.LastBlockID, cs.state.LastValidators.Hash(), commit)
+	return cs.blockOperations.CreateProposalBlock(cs.Height.Uint64(), cs.state.LastBlockID, cs.state.LastValidators.Hash(), commit)
 }
 
 // Returns true if the proposal block is complete &&

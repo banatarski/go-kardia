@@ -113,7 +113,7 @@ func newDualService(ctx *node.ServiceContext, config *DualConfig) (*DualService,
 	state := state.LastestBlockState{
 		ChainID:                     "kaigroupcon",
 		LastBlockHeight:             cmn.NewBigUint64(block.Height()),
-		LastBlockID:                 types.BlockID{Hash: block.Hash()},
+		LastBlockID:                 block.Hash(),
 		LastBlockTime:               block.Time(),
 		Validators:                  validatorSet,
 		LastValidators:              validatorSet,

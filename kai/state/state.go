@@ -20,10 +20,11 @@ package state
 
 import (
 	"fmt"
-	cmn "github.com/kardiachain/go-kardia/lib/common"
-	"github.com/kardiachain/go-kardia/types"
 	"math/big"
 	"time"
+
+	cmn "github.com/kardiachain/go-kardia/lib/common"
+	"github.com/kardiachain/go-kardia/types"
 )
 
 // It keeps all information necessary to validate new blocks,
@@ -39,7 +40,7 @@ type LastestBlockState struct {
 	// LastBlockHeight=0 at genesis (ie. block(H=0) does not exist)
 	LastBlockHeight  *cmn.BigInt
 	LastBlockTotalTx *cmn.BigInt
-	LastBlockID      types.BlockID
+	LastBlockID      cmn.Hash
 	LastBlockTime    *big.Int
 
 	// LastValidators is used to validate block.LastCommit.

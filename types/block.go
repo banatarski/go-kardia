@@ -69,7 +69,7 @@ type Header struct {
 	GasUsed  uint64 `json:"gasUsed"          gencodec:"required"`
 
 	// prev block info
-	LastBlockID BlockID `json:"last_block_id"`
+	LastBlockID common.Hash `json:"last_block_id"`
 	//@huny TotalTxs    uint64   `json:"total_txs"`
 
 	Coinbase common.Address `json:"miner"            gencodec:"required"`
@@ -111,8 +111,10 @@ func (h *Header) StringLong() string {
 		return "nil-Header"
 	}
 	// TODO(thientn): check why String() of common.Hash is not called when logging, and have to call Hex() instead.
-	return fmt.Sprintf("Header{Height:%v  Time:%v  NumTxs:%v  LastBlockID:%v  LastCommitHash:%v  TxHash:%v  Root:%v  ValidatorsHash:%v  ConsensusHash:%v}#%v",
-		h.Height, time.Unix(h.Time.Int64(), 0), h.NumTxs, h.LastBlockID, h.LastCommitHash.Hex(), h.TxHash.Hex(), h.Root.Hex(), h.ValidatorsHash.Hex(), h.ConsensusHash.Hex(), h.Hash().Hex())
+	// return fmt.Sprintf("Header{Height:%v  Time:%v  NumTxs:%v  LastBlockID:%v  LastCommitHash:%v  TxHash:%v  Root:%v  ValidatorsHash:%v  ConsensusHash:%v}#%v",
+	// 	h.Height, time.Unix(h.Time.Int64(), 0), h.NumTxs, h.LastBlockID, h.LastCommitHash.Hex(), h.TxHash.Hex(), h.Root.Hex(), h.ValidatorsHash.Hex(), h.ConsensusHash.Hex(), h.Hash().Hex())
+	return fmt.Sprintf("Header{Height:%v  NumTxs:%v  LastBlockID:%v  LastCommitHash:%v  TxHash:%v  Root:%v  ValidatorsHash:%v  ConsensusHash:%v}#%v",
+		h.Height, h.NumTxs, h.LastBlockID, h.LastCommitHash.Hex(), h.TxHash.Hex(), h.Root.Hex(), h.ValidatorsHash.Hex(), h.ConsensusHash.Hex(), h.Hash().Hex())
 
 }
 

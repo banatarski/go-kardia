@@ -78,7 +78,7 @@ func validateBlock(state LastestBlockState, block *types.Block) error {
 				state.LastValidators.Size(), len(block.LastCommit().Precommits))
 		}
 		err := state.LastValidators.VerifyCommit(
-			state.ChainID, state.LastBlockID, int64(block.Height()-1), block.LastCommit())
+			state.ChainID, int64(block.Height()-1), block.LastCommit())
 		if err != nil {
 			return err
 		}
