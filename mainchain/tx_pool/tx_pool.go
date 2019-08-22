@@ -1320,3 +1320,8 @@ func (t *txLookup) Remove(hash common.Hash) {
 
 	delete(t.all, hash)
 }
+
+// Get Blockchain
+func (pool *TxPool) GetBlockChain() blockChain {
+	return pool.chain
+}

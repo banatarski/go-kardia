@@ -801,9 +801,19 @@ func genTxsLoop(numTxs int, txPool *tx_pool.TxPool) {
 	genTool := tool.NewGeneratorTool()
 	time.Sleep(60 * time.Second)
 	genRound := 0
+	initHeight := txPool.GetBlockChain().CurrentBlock().Height()
 	for {
-		go genTxs(genTool, numTxs, txPool, genRound)
-		genRound++
+		height := txPool.GetBlockChain().CurrentBlock().Height()
+
+		// Let's assume that current height is greater than oldHeight, continue generate txs
+		if height > initHeight {
+			initHeight = height
+			go genTxs(genTool, numTxs, txPool, genRound)
+			genRound++
+		} else {
+			log.Warn("Skip GenTxs due to height", "prevHeight", initHeight, "currentHeight", height)
+		}
+
 		time.Sleep(time.Duration(args.txsDelay) * time.Second)
 	}
 }
