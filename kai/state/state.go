@@ -20,10 +20,11 @@ package state
 
 import (
 	"fmt"
-	cmn "github.com/kardiachain/go-kardia/lib/common"
-	"github.com/kardiachain/go-kardia/types"
 	"math/big"
 	"time"
+
+	cmn "github.com/kardiachain/go-kardia/lib/common"
+	"github.com/kardiachain/go-kardia/types"
 )
 
 // It keeps all information necessary to validate new blocks,

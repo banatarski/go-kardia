@@ -84,7 +84,7 @@ type RoundState struct {
 	Validators      *types.ValidatorSet `json:"validators"`  // TODO(huny@): Assume static validator set for now
 	Proposal        *types.Proposal     `json:"proposal"`
 	ProposalBlock   *types.Block        `json:"proposal_block"`    // Simply cache the block from Proposal
-	ProposalBlockID types.BlockID       `json:"proposal_block_ID"` // Used mostly for catchup when proposal isn't sent but only proposed block's header
+	ProposalBlockID cmn.Hash            `json:"proposal_block_ID"` // Used mostly for catchup when proposal isn't sent but only proposed block's header
 	LockedRound     *cmn.BigInt         `json:"locked_round"`
 	LockedBlock     *types.Block        `json:"locked_block"`
 	ValidRound      *cmn.BigInt         `json:"valid_round"` // Last known round with POL for non-nil valid block.
