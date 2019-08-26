@@ -183,14 +183,14 @@ func DefaultConsensusConfig() *ConsensusConfig {
 		TimeoutProposeDelta:         500,
 		TimeoutPrevote:              1000,
 		TimeoutPrevoteDelta:         500,
-		TimeoutPrecommit:            1000,
+		TimeoutPrecommit:            3000,
 		TimeoutPrecommitDelta:       500,
 		TimeoutCommit:               1000,
 		SkipTimeoutCommit:           false,
 		CreateEmptyBlocks:           true,
 		CreateEmptyBlocksInterval:   0,
-		PeerGossipSleepDuration:     500,
-		PeerQueryMaj23SleepDuration: 1000,
+		PeerGossipSleepDuration:     1000,
+		PeerQueryMaj23SleepDuration: 2000,
 	}
 }
 

@@ -45,10 +45,6 @@ const (
 	// The number is referenced from the size of tx pool.
 	txChanSize = 8192
 	csChanSize = 8192 // Consensus channel size.
-
-	// WorkerPool for AsyncSendTransactions
-	// txsWorker          = 4
-	// txsWorkerQueueSize = 1024
 )
 
 // errIncompatibleConfig is returned if the requested protocols and configs are
@@ -351,6 +347,8 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		pm.csReactor.ReceiveNewCommit(msg, p.Peer)
 	case msg.Code == serviceconst.CsBlockMsg:
 		pm.logger.Trace("Block message received")
+	case msg.Code == serviceconst.CsBlockPartMsg:
+		pm.logger.Trace("Block Part message received")
 		pm.csReactor.ReceiveBlock(msg, p.Peer)
 	case msg.Code == serviceconst.CsVoteSetMaj23Message:
 		pm.logger.Trace("VoteSetMaj23 message received")
@@ -407,7 +405,7 @@ func (pm *ProtocolManager) Broadcast(msg interface{}, msgType uint64) {
 
 	// If ok is true, then simplify the log
 	if ok {
-		pm.logger.Info("Start broadcast consensus message", "Height", v.Height, "Block", v.Block.Hash().String(), "msgType", msgType)
+		pm.logger.Info("Start broadcast consensus message", "Height", v.Height, "Block", v.BlockPartsHeader.String(), "msgType", msgType)
 	} else {
 		pm.logger.Info("Start broadcast consensus message", "msg", msg, "msgType", msgType)
 	}

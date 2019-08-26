@@ -32,40 +32,27 @@ import (
 // to be considered valid. It may depend on votes from a previous round,
 // a so-called Proof-of-Lock (POL) round, as noted in the POLRound and POLBlockID.
 type Proposal struct {
-	Height     *cmn.BigInt `json:"height"`
-	Round      *cmn.BigInt `json:"round"`
-	Timestamp  *big.Int    `json:"timestamp"` // TODO(thientn/namdoh): epoch seconds, change to milis.
-	Block      *Block      `json:"block"`
-	POLRound   *cmn.BigInt `json:"pol_round"`    // -1 if null.
-	POLBlockID BlockID     `json:"pol_block_id"` // zero if null.
-	Signature  []byte      `json:"signature"`
+	Height           *cmn.BigInt `json:"height"`
+	Round            *cmn.BigInt `json:"round"`
+	Timestamp        *big.Int    `json:"timestamp"` // TODO(thientn/namdoh): epoch seconds, change to milis.
+	Block            *Block
+	BlockPartsHeader PartSetHeader `json:"block_parts_header"`
+	POLRound         *cmn.BigInt   `json:"pol_round"`    // -1 if null.
+	POLBlockID       BlockID       `json:"pol_block_id"` // zero if null.
+	Signature        []byte        `json:"signature"`
 }
 
 // NewProposal returns a new Proposal.
 // If there is no POLRound, polRound should be -1.
-func NewProposal(height *cmn.BigInt, round *cmn.BigInt, block *Block, polRound *cmn.BigInt, polBlockID BlockID) *Proposal {
+func NewProposal(height *cmn.BigInt, round *cmn.BigInt, blockPartsHeader PartSetHeader, polRound *cmn.BigInt, polBlockID BlockID) *Proposal {
 	return &Proposal{
-		Height:     height,
-		Round:      round,
-		Timestamp:  big.NewInt(time.Now().Unix()),
-		Block:      block,
-		POLRound:   polRound,
-		POLBlockID: polBlockID,
+		Height:           height,
+		Round:            round,
+		Timestamp:        big.NewInt(time.Now().Unix()),
+		BlockPartsHeader: blockPartsHeader,
+		POLRound:         polRound,
+		POLBlockID:       polBlockID,
 	}
-}
-
-// This function is used to address RLP's diosyncrasies (issues#73), enabling
-// RLP encoding/decoding to pass.
-// Note: Use this "before" sending the object to other peers.
-func (p *Proposal) MakeNilEmpty() {
-	p.Block.MakeNilEmpty()
-}
-
-// This function is used to address RLP's diosyncrasies (issues#73), enabling
-// RLP encoding/decoding to pass.
-// Note: Use this "after" receiving the object to other peers.
-func (p *Proposal) MakeEmptyNil() {
-	p.Block.MakeEmptyNil()
 }
 
 // SignBytes returns the Proposal bytes for signing
@@ -80,7 +67,7 @@ func (p *Proposal) SignBytes(chainID string) []byte {
 // String returns a short string representing the Proposal
 func (p *Proposal) String() string {
 	return fmt.Sprintf("Proposal{%v/%v %v (%v,%v) %X @%v}",
-		p.Height, p.Round, p.Block, p.POLRound,
+		p.Height, p.Round, p.BlockPartsHeader, p.POLRound,
 		p.POLBlockID,
 		cmn.Fingerprint(p.Signature[:]),
 		time.Unix(p.Timestamp.Int64(), 0))

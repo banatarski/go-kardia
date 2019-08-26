@@ -50,7 +50,7 @@ type DualBlockOperations struct {
 	height uint64
 }
 
-// Returns a new DualBlockOperations with latest chain & ,
+// NewDualBlockOperations return a new DualBlockOperations with latest chain & ,
 // initialized to the last height that was committed to the DB.
 func NewDualBlockOperations(logger log.Logger, blockchain *DualBlockChain, eventPool *event_pool.EventPool) *DualBlockOperations {
 	return &DualBlockOperations{
@@ -65,12 +65,14 @@ func (dbo *DualBlockOperations) SetDualBlockChainManager(bcManager *DualBlockCha
 	dbo.bcManager = bcManager
 }
 
+// Height returns Height of the DualBlock
 func (dbo *DualBlockOperations) Height() uint64 {
 	return dbo.height
 }
 
-// Proposes a new block for dual's blockchain.
-func (dbo *DualBlockOperations) CreateProposalBlock(height int64, lastBlockID types.BlockID, lastValidatorHash common.Hash, commit *types.Commit) (block *types.Block) {
+// CreateProposalBlock Proposes a new block for dual's blockchain.
+func (dbo *DualBlockOperations) CreateProposalBlock(height int64, lastBlockID types.BlockID,
+	lastValidatorHash common.Hash, commit *types.Commit) (block *types.Block, partSet *types.PartSet) {
 	// Gets all dual's events in pending pools and them to the new block.
 	// TODO(namdoh@): Since there may be a small latency for other dual peers to see the same set of
 	// dual's events, we may need to wait a bit here.
@@ -83,7 +85,7 @@ func (dbo *DualBlockOperations) CreateProposalBlock(height int64, lastBlockID ty
 	stateRoot, err := dbo.commitDualEvents(events)
 	if err != nil {
 		dbo.logger.Error("Fail to commit dual's events", "err", err)
-		return nil
+		return nil, nil
 	}
 	header.Root = stateRoot
 
@@ -91,7 +93,7 @@ func (dbo *DualBlockOperations) CreateProposalBlock(height int64, lastBlockID ty
 		previousBlock := dbo.blockchain.GetBlockByHeight(uint64(height) - 1)
 		if previousBlock == nil {
 			dbo.logger.Error("Get previous block N-1 failed", "proposedHeight", height)
-			return nil
+			return nil, nil
 		}
 		// TODO(#169,namdoh): Break this propose step into two passes--first is to propose
 		// pending DualEvents, second is to propose submission receipts of N-1 DualEvent-derived Txs
@@ -100,7 +102,7 @@ func (dbo *DualBlockOperations) CreateProposalBlock(height int64, lastBlockID ty
 		_, err := dbo.submitDualEvents(previousBlock.DualEvents())
 		if err != nil {
 			dbo.logger.Error("Fail to submit dual events", "err", err)
-			return nil
+			return nil, nil
 		}
 		dbo.logger.Info("Not yet implemented - Update state root with the DualEvent's submission receipt")
 	}
@@ -108,10 +110,10 @@ func (dbo *DualBlockOperations) CreateProposalBlock(height int64, lastBlockID ty
 	block = dbo.newBlock(header, events, commit)
 	dbo.logger.Trace("Make block to propose", "block", block)
 
-	return block
+	return block, nil
 }
 
-// Executes and commits the new state from events in the given block.
+// CommitAndValidateBlockTxs executes and commits the new state from events in the given block.
 // This also validate the new state root against the block root.
 func (dbo *DualBlockOperations) CommitAndValidateBlockTxs(block *types.Block) error {
 	root, err := dbo.commitDualEvents(block.DualEvents())
@@ -135,12 +137,12 @@ func (dbo *DualBlockOperations) CommitBlockTxsIfNotFound(block *types.Block) err
 	return nil
 }
 
-// Persists the given block, blockParts, and seenCommit to the underlying db.
+// SaveBlock persists the given block, blockParts, and seenCommit to the underlying db.
 // seenCommit: The +2/3 precommits that were seen which committed at height.
 //             If all the nodes restart after committing a block,
 //             we need this to reload the precommits to catch-up nodes to the
 //             most recent height.  Otherwise they'd stall at H-1.
-func (dbo *DualBlockOperations) SaveBlock(block *types.Block, seenCommit *types.Commit) {
+func (dbo *DualBlockOperations) SaveBlock(block *types.Block, blockPart *types.PartSet, seenCommit *types.Commit) {
 	if block == nil {
 		common.PanicSanity("DualBlockOperations try to save a nil block")
 	}
@@ -177,14 +179,14 @@ func (dbo *DualBlockOperations) SaveBlock(block *types.Block, seenCommit *types.
 	dbo.mtx.Unlock()
 }
 
-// Returns the Block for the given height.
+// LoadBlock Returns the Block for the given height.
 // If no block is found for the given height, it returns nil.
 func (dbo *DualBlockOperations) LoadBlock(height uint64) *types.Block {
 	return dbo.blockchain.GetBlockByHeight(height)
 }
 
-// Returns the Block for the given height.
-// If no block is found for the given height, it returns nil.
+// LoadBlockCommit Returns the Block for the given height.
+// If no block is found for the given reight, it returns nil.
 func (dbo *DualBlockOperations) LoadBlockCommit(height uint64) *types.Commit {
 	block := dbo.blockchain.GetBlockByHeight(height + 1)
 	if block == nil {
@@ -194,7 +196,7 @@ func (dbo *DualBlockOperations) LoadBlockCommit(height uint64) *types.Commit {
 	return block.LastCommit()
 }
 
-// Returns the locally seen Commit for the given height.
+// LoadSeenCommit Returns the locally seen Commit for the given height.
 // This is useful when we've seen a commit, but there has not yet been
 // a new block at `height + 1` that includes this commit in its block.LastCommit.
 func (dbo *DualBlockOperations) LoadSeenCommit(height uint64) *types.Commit {
@@ -208,13 +210,13 @@ func (dbo *DualBlockOperations) LoadSeenCommit(height uint64) *types.Commit {
 
 // Creates new block header from given data.
 // Some header fields are not ready at this point.
-func (dbo *DualBlockOperations) newHeader(height int64, numEvents uint64, blockId types.BlockID, validatorsHash common.Hash) *types.Header {
+func (dbo *DualBlockOperations) newHeader(height int64, numEvents uint64, blockID types.BlockID, validatorsHash common.Hash) *types.Header {
 	return &types.Header{
 		// ChainID: state.ChainID, TODO(huny/namdoh): confims that ChainID is replaced by network id.
 		Height:         uint64(height),
 		NumDualEvents:  numEvents,
 		Time:           big.NewInt(time.Now().Unix()),
-		LastBlockID:    blockId,
+		LastBlockID:    blockID,
 		ValidatorsHash: validatorsHash,
 	}
 }

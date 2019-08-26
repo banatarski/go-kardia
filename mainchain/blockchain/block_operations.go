@@ -61,7 +61,7 @@ func (bo *BlockOperations) Height() uint64 {
 
 // CreateProposalBlock creates a new proposal block with all current pending txs in pool.
 func (bo *BlockOperations) CreateProposalBlock(height int64, lastBlockID types.BlockID,
-	lastValidatorHash common.Hash, commit *types.Commit) (block *types.Block) {
+	lastValidatorHash common.Hash, commit *types.Commit) (block *types.Block, partSet *types.PartSet) {
 	// Gets all transactions in pending pools and execute them to get new account states.
 	// Tx execution can happen in parallel with voting or precommitted.
 	// For simplicity, this code executes & commits txs before sending proposal,
@@ -76,7 +76,7 @@ func (bo *BlockOperations) CreateProposalBlock(height int64, lastBlockID types.B
 	stateRoot, receipts, err := bo.commitTransactions(txs, header)
 	if err != nil {
 		bo.logger.Error("Fail to commit transactions", "err", err)
-		return nil
+		return nil, nil
 	}
 	header.Root = stateRoot
 
@@ -85,7 +85,7 @@ func (bo *BlockOperations) CreateProposalBlock(height int64, lastBlockID types.B
 
 	bo.saveReceipts(receipts, block)
 
-	return block
+	return block, nil
 }
 
 // CommitAndValidateBlockTxs executes and commits the transactions in the given block.
@@ -124,7 +124,7 @@ func (bo *BlockOperations) CommitBlockTxsIfNotFound(block *types.Block) error {
 //             If all the nodes restart after committing a block,
 //             we need this to reload the precommits to catch-up nodes to the
 //             most recent height.  Otherwise they'd stall at H-1.
-func (bo *BlockOperations) SaveBlock(block *types.Block, seenCommit *types.Commit) {
+func (bo *BlockOperations) SaveBlock(block *types.Block, blockPart *types.PartSet, seenCommit *types.Commit) {
 	if block == nil {
 		common.PanicSanity("BlockOperations try to save a nil block")
 	}
@@ -193,13 +193,13 @@ func (bo *BlockOperations) LoadSeenCommit(height uint64) *types.Commit {
 
 // newHeader creates new block header from given data.
 // Some header fields are not ready at this point.
-func (bo *BlockOperations) newHeader(height int64, numTxs uint64, blockId types.BlockID, validatorsHash common.Hash) *types.Header {
+func (bo *BlockOperations) newHeader(height int64, numTxs uint64, blockID types.BlockID, validatorsHash common.Hash) *types.Header {
 	return &types.Header{
 		// ChainID: state.ChainID, TODO(huny/namdoh): confims that ChainID is replaced by network id.
 		Height:         uint64(height),
 		Time:           big.NewInt(time.Now().Unix()),
 		NumTxs:         numTxs,
-		LastBlockID:    blockId,
+		LastBlockID:    blockID,
 		ValidatorsHash: validatorsHash,
 		GasLimit:       10000000,
 	}
