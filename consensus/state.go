@@ -287,9 +287,9 @@ func (cs *ConsensusState) AddVote(vote *types.Vote, peerID discover.NodeID) (add
 	return false, nil
 }
 
-func (cs *ConsensusState) decideProposal(height *cmn.BigInt, round *cmn.BigInt) {
-	var block *types.Block
-	var blockParts *types.PartSet
+func (cs *ConsensusState) decideProposal(height *cmn.BigInt, round *cmn.BigInt, pBlock *types.Block, pBlockParts *types.PartSet) {
+	var block = pBlock
+	var blockParts = pBlockParts
 
 	// Decide on block
 	if cs.LockedBlock != nil {
@@ -301,9 +301,8 @@ func (cs *ConsensusState) decideProposal(height *cmn.BigInt, round *cmn.BigInt) 
 	} else {
 		// Create a new proposal block from state/txs from the mempool.
 		// Decide on block
-		block, blockParts = cs.createProposalBlock()
 		if block == nil { // on error
-			cs.logger.Trace("Create proposal block failed")
+			cs.logger.Trace("Block or BlockParts is nil", "height", height, "round", round)
 			return
 		}
 	}
@@ -780,13 +779,71 @@ func (cs *ConsensusState) enterNewRound(height *cmn.BigInt, round *cmn.BigInt) {
 
 	cs.eventBus.PublishEventNewRound(cs.RoundStateEvent())
 
-	cs.enterPropose(height, round)
+	cs.beforeEnterProposal(height, round)
+	log.Error("Proposal block", cs.ProposalBlock.StringLong())
+}
+
+func (cs *ConsensusState) beforeEnterProposal(height *cmn.BigInt, round *cmn.BigInt) {
+	logger := cs.logger.New("height", height, "round", round)
+
+	if !cs.Height.Equals(height) || round.IsLessThan(cs.Round) || (cs.Round.Equals(round) && cstypes.RoundStepPropose <= cs.Step) {
+		logger.Debug(cmn.Fmt("beforeEnterPropose(%v/%v): Invalid args. Current step: %v/%v/%v", height, round, cs.Height, cs.Round, cs.Step))
+		return
+	}
+
+	// If we don't get the proposal and block parts quick enough, enterPrevote
+	cs.scheduleTimeout(cs.config.Propose(round.Int32()), height, round, cstypes.RoundStepPropose)
+
+	inProgress := true
+
+	// TODO(namdoh): For now this any node is a validator. Remove it once we
+	// restrict who can be validator.
+	// Nothing more to do if we're not a validator
+	if cs.privValidator == nil {
+		logger.Debug("This node is not a validator")
+		return
+	}
+	// if not a validator, we're done
+	if !cs.Validators.HasAddress(cs.privValidator.GetAddress()) {
+		logger.Debug("This node is not a validator", "addr", cs.privValidator.GetAddress(), "vals", cs.Validators)
+		inProgress = false
+	} else if !cs.isProposer() {
+		inProgress = false
+	}
+
+	var block *types.Block
+	var blockParts *types.PartSet
+
+	if inProgress {
+		block, blockParts = cs.createProposalBlock()
+		if block == nil {
+			log.Debug("createProposalBlock", "height:", height, "round:", round)
+			inProgress = false
+		} else if block != nil {
+			if height != cmn.NewBigUint64(block.Height()) {
+				log.Debug("Height not match", "cs.Height", height, "block.height", block.Height())
+				inProgress = false
+			}
+		}
+	}
+	if !inProgress {
+		cs.updateRoundStep(round, cstypes.RoundStepPropose)
+		cs.newStep()
+		// If we have the proposal + POL, then goto Prevote now.
+		// Else, we'll enterPrevote when the rest of the proposal is received (in AddProposalBlockPart),
+		// Else after timeoutPropose
+		if cs.isProposalComplete() {
+			cs.enterPrevote(height, cs.Round)
+		}
+	}
+
+	cs.enterPropose(height, round, block, blockParts)
 }
 
 // Enter (CreateEmptyBlocks): from enterNewRound(height,round)
 // Enter (CreateEmptyBlocks, CreateEmptyBlocksInterval > 0 ): after enterNewRound(height,round), after timeout of CreateEmptyBlocksInterval
 // Enter (!CreateEmptyBlocks) : after enterNewRound(height,round), once txs are in the mempool
-func (cs *ConsensusState) enterPropose(height *cmn.BigInt, round *cmn.BigInt) {
+func (cs *ConsensusState) enterPropose(height *cmn.BigInt, round *cmn.BigInt, block *types.Block, blockParts *types.PartSet) {
 	logger := cs.logger.New("height", height, "round", round)
 
 	if !cs.Height.Equals(height) || round.IsLessThan(cs.Round) || (cs.Round.Equals(round) && cstypes.RoundStepPropose <= cs.Step) {
@@ -808,30 +865,8 @@ func (cs *ConsensusState) enterPropose(height *cmn.BigInt, round *cmn.BigInt) {
 		}
 	}()
 
-	// If we don't get the proposal and block parts quick enough, enterPrevote
-	cs.scheduleTimeout(cs.config.Propose(round.Int32()), height, round, cstypes.RoundStepPropose)
-
-	// TODO(namdoh): For now this any node is a validator. Remove it once we
-	// restrict who can be validator.
-	// Nothing more to do if we're not a validator
-	if cs.privValidator == nil {
-		logger.Debug("This node is not a validator")
-		return
-	}
-	// if not a validator, we're done
-	if !cs.Validators.HasAddress(cs.privValidator.GetAddress()) {
-		logger.Debug("This node is not a validator", "addr", cs.privValidator.GetAddress(), "vals", cs.Validators)
-		return
-	}
-
-	logger.Debug("This node is a validator")
 	if cs.isProposer() {
-		logger.Trace("Our turn to propose")
-		//namdoh@ logger.Info("enterPropose: Our turn to propose", "proposer", cs.Validators.GetProposer().Address, "privValidator", cs.privValidator)
-		cs.decideProposal(height, round)
-	} else {
-		logger.Trace("Not our turn to propose")
-		//namdoh@ logger.Info("enterPropose: Not our turn to propose", "proposer", cs.Validators.GetProposer().Address, "privValidator", cs.privValidator)
+		cs.decideProposal(height, round, block, blockParts)
 	}
 }
 
@@ -977,7 +1012,6 @@ func (cs *ConsensusState) enterPrecommit(height *cmn.BigInt, round *cmn.BigInt) 
 	if polRound < round.Int32() {
 		cmn.PanicSanity(cmn.Fmt("This POLRound should be %v but got %", round, polRound))
 	}
-
 	// +2/3 prevoted nil. Unlock and precommit nil.
 	if blockID.IsZero() {
 		if cs.LockedBlock == nil {
@@ -1371,7 +1405,7 @@ func (cs *ConsensusState) handleTimeout(ti timeoutInfo, rs cstypes.RoundState) {
 		// NewRound event fired from enterNewRound.
 		cs.enterNewRound(ti.Height, cmn.NewBigInt32(0))
 	case cstypes.RoundStepNewRound:
-		cs.enterPropose(ti.Height, cmn.NewBigInt32(0))
+		cs.beforeEnterProposal(ti.Height, cmn.NewBigInt32(0))
 	case cstypes.RoundStepPropose:
 		cs.enterPrevote(ti.Height, ti.Round)
 	case cstypes.RoundStepPrevoteWait:

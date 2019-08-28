@@ -393,7 +393,7 @@ func (b *Block) SetLastCommit(c *Commit) {
 func (b *Block) Header() *Header { return CopyHeader(b.header) }
 
 func (b *Block) HashesTo(bid BlockID) bool {
-	return b.Hash().Equal(common.Hash(bid.Hash))
+	return b.Hash().Equal(bid.Hash)
 }
 
 // Size returns the true RLP encoded storage size of the block, either by encoding
@@ -419,7 +419,7 @@ func (b *Block) ValidateBasic() error {
 
 	newTxs := uint64(len(b.transactions))
 	if b.header.NumTxs != newTxs {
-		return fmt.Errorf("wrong Block.Header.NumTxs. Expected %v, got %v", newTxs, b.header.NumTxs)
+		return fmt.Errorf("Wrong Block Header/NumTxs. Expected %v, got %v", newTxs, b.header.NumTxs)
 	}
 
 	if b.lastCommit == nil && !b.header.LastCommitHash.IsZero() {
@@ -802,7 +802,7 @@ func (blockID BlockID) StringLong() string {
 
 // BlockID return Hash of a block
 func (b *Block) BlockHash() common.Hash {
-	return common.Hash(b.Hash())
+	return b.Hash()
 }
 
 // BlockID return Hash of a block

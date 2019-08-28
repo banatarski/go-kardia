@@ -230,6 +230,26 @@ func (conR *ConsensusManager) ReceiveBlock(generalMsg p2p.Msg, src *p2p.Peer) {
 	conR.conS.peerMsgQueue <- msgInfo{&msg, src.ID()}
 }
 
+func (conR *ConsensusManager) ReceiveBlockPart(generalMsg p2p.Msg, src *p2p.Peer) {
+	conR.logger.Trace("Consensus manager received block part", "peer", src)
+
+	if !conR.running {
+		conR.logger.Trace("Consensus manager isn't running.")
+		return
+	}
+
+	var msg BlockPartMessage
+	if err := generalMsg.Decode(&msg); err != nil {
+		conR.logger.Error("Invalid BlockPartMessage", "msg", generalMsg, "err", err)
+		return
+	}
+	// msg.Block.SetLogger(conR.logger)
+
+	conR.logger.Trace("Decoded msg", "msg", fmt.Sprintf("Height:%v   Round:%v   BlockPart:%v", msg.Height, msg.Round, msg.Part))
+
+	conR.conS.peerMsgQueue <- msgInfo{&msg, src.ID()}
+}
+
 func (conR *ConsensusManager) ReceiveNewVote(generalMsg p2p.Msg, src *p2p.Peer) {
 	conR.logger.Trace("Consensus manager received NewVote", "peer", src)
 
@@ -532,7 +552,6 @@ OUTER_LOOP:
 	for {
 		// Manage disconnects from self or peer.
 		if !peer.IsAlive || !conR.running {
-			logger.Info("Stopping gossipDataRoutine for peer")
 			return
 		}
 		rs := conR.conS.GetRoundState()
@@ -560,6 +579,7 @@ OUTER_LOOP:
 		// If the peer is on a previous height, help catch up.
 		if prs.Height.IsGreaterThanInt(0) && prs.Height.IsLessThan(rs.Height) {
 			block := conR.conS.blockOperations.LoadBlock(prs.Height.Uint64())
+
 			lastCommit := conR.conS.LoadCommit(prs.Height)
 			if lastCommit == nil {
 				panic(cmn.Fmt("Loading commit of previous block fails and returns nil. rs.Height=%v vs. prs.Height=%v", rs.Height, prs.Height))
@@ -630,7 +650,6 @@ OUTER_LOOP:
 	for {
 		// Manage disconnects from self or peer.
 		if !peer.IsAlive || !conR.running {
-			logger.Info("Stopping gossipVotesRoutine for peer")
 			return
 		}
 		rs := conR.conS.GetRoundState()
