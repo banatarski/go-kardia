@@ -33,10 +33,18 @@ import (
 
 	"github.com/kardiachain/go-kardia/lib/common"
 	"github.com/kardiachain/go-kardia/lib/crypto/sha3"
+	amino "github.com/kardiachain/go-kardia/lib/go-amino"
 	"github.com/kardiachain/go-kardia/lib/log"
 	"github.com/kardiachain/go-kardia/lib/merkle"
 	"github.com/kardiachain/go-kardia/lib/rlp"
 	"github.com/kardiachain/go-kardia/lib/trie"
+)
+
+const (
+	MaxLimitBlockStore = 200     // Not use yet
+	MaxBlockBytes      = 1048510 // lMB
+	// BlockPartSizeBytes is the size of one block part.
+	BlockPartSizeBytes = 65536 // 64kB
 )
 
 var (
@@ -46,6 +54,7 @@ var (
 	ErrPartSetInvalidProof = errors.New("error part set invalid proof")
 
 	EmptyRootHash = DeriveSha(Transactions{})
+	cdc           = amino.NewCodec()
 )
 
 //go:generate gencodec -type Header -field-override headerMarshaling -out gen_header_json.go
@@ -718,6 +727,39 @@ func (ps *PartSet) GetReader() io.Reader {
 		common.PanicSanity("Cannot GetReader() on incomplete PartSet")
 	}
 	return NewPartSetReader(ps.parts)
+}
+
+//MakePartSet makes block to partset
+func MakePartSet(partSize uint, block *Block) (*PartSet, error) {
+	// Prefix the byte length, so that unmarshaling
+	// can easily happen via a reader.
+	bzs, err := rlp.EncodeToBytes(block)
+	if err != nil {
+		panic(err)
+	}
+	bz, err := cdc.MarshalBinary(bzs)
+	if err != nil {
+		return nil, err
+	}
+	return NewPartSetFromData(bz, partSize), nil
+}
+
+//MakeBlockFromPartSet makes partSet to block
+func MakeBlockFromPartSet(reader *PartSet) (*Block, error) {
+	if reader.IsComplete() {
+		maxsize := int64(MaxBlockBytes)
+		b := make([]byte, maxsize, maxsize)
+		_, err := cdc.UnmarshalBinaryReader(reader.GetReader(), &b, maxsize)
+		if err != nil {
+			return nil, err
+		}
+		var block Block
+		if err = rlp.DecodeBytes(b, &block); err != nil {
+			return nil, err
+		}
+		return &block, nil
+	}
+	return nil, errors.New("Make block from partset not complete")
 }
 
 //PartSetReader struct

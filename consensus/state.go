@@ -287,80 +287,6 @@ func (cs *ConsensusState) AddVote(vote *types.Vote, peerID discover.NodeID) (add
 	return false, nil
 }
 
-func (cs *ConsensusState) decideProposal(height *cmn.BigInt, round *cmn.BigInt, pBlock *types.Block, pBlockParts *types.PartSet) {
-	var block = pBlock
-	var blockParts = pBlockParts
-
-	// Decide on block
-	if cs.LockedBlock != nil {
-		// If we're locked onto a block, just choose that.
-		block, blockParts = cs.LockedBlock, cs.LockedBlockParts
-	} else if cs.ValidBlock != nil {
-		// If there is valid block, choose that.
-		block, blockParts = cs.ValidBlock, cs.ValidBlockParts
-	} else {
-		// Create a new proposal block from state/txs from the mempool.
-		// Decide on block
-		if block == nil { // on error
-			cs.logger.Trace("Block or BlockParts is nil", "height", height, "round", round)
-			return
-		}
-	}
-
-	// Make proposal
-	polRound, polBlockID := cs.Votes.POLInfo()
-	proposal := types.NewProposal(height, round, blockParts.Header(), cmn.NewBigInt32(polRound), polBlockID)
-	if err := cs.privValidator.SignProposal(cs.state.ChainID, proposal); err == nil {
-
-		cs.logger.Info("Signed proposal", "height", height, "round", round, "proposal", proposal)
-		// Send proposal on internal msg queue
-		cs.sendInternalMessage(msgInfo{&ProposalMessage{proposal}, discover.ZeroNodeID()})
-		for i := 0; i < int(blockParts.Total()); i++ {
-			part := blockParts.GetPart(uint(i))
-			cs.sendInternalMessage(msgInfo{&BlockPartMessage{cs.Height, cs.Round, part}, discover.ZeroNodeID()})
-		}
-	}
-}
-
-func (cs *ConsensusState) setProposal(proposal *types.Proposal) error {
-	cs.logger.Trace("setProposal()", "proposal", proposal)
-
-	if cs.Proposal != nil {
-		cs.logger.Trace("cs.Proposal isn't nil. Returns early.")
-		return nil
-	}
-
-	// Does not apply
-	if !proposal.Height.Equals(cs.Height) || !proposal.Round.Equals(cs.Round) {
-		cs.logger.Trace(fmt.Sprintf("CS[%v/%v] doesn't match Proposal[%v/%v]", cs.Height, cs.Round, proposal.Height, proposal.Round))
-		return nil
-	}
-
-	// We don't care about the proposal if we're already in cstypes.RoundStepCommit.
-	if cstypes.RoundStepCommit <= cs.Step {
-		cs.logger.Trace("cs.Step is already beyond RoundStepCommit", "cs.Step", cs.Step)
-		return nil
-	}
-
-	// Verify POLRound, which must be -1 or between 0 and proposal.Round exclusive.
-	if !proposal.POLRound.EqualsInt(-1) &&
-		(proposal.POLRound.IsLessThanInt(0) || proposal.Round.IsLessThanOrEquals(proposal.POLRound)) {
-		cs.logger.Trace("Invalid proposal POLRound", "proposal.POLRound", proposal.POLRound, "proposal.Round", proposal.Round)
-		return ErrInvalidProposalPOLRound
-	}
-
-	// Verify signature
-	if !cs.Validators.GetProposer().VerifyProposalSignature(cs.state.ChainID, proposal) {
-		cs.logger.Trace("Verify proposal signature failed.")
-		return ErrInvalidProposalSignature
-	}
-
-	cs.Proposal = proposal
-	cs.ProposalBlockParts = types.NewPartSetFromHeader(proposal.BlockPartsHeader)
-	log.Debug("Received proposal", "proposal", proposal)
-	return nil
-}
-
 // ------- HELPER METHODS -------- //
 
 // enterNewRound(height, 0) at cs.StartTime.
@@ -412,35 +338,33 @@ func (cs *ConsensusState) reconstructLastCommit(state state.LastestBlockState) {
 
 // NOTE: block is not necessarily valid.
 // Asynchronously triggers either enterPrevote (before we timeout of propose) or tryFinalizeCommit, once we have the full block.
-func (cs *ConsensusState) handleBlockPartMessage(msg *BlockPartMessage, peerID discover.NodeID) (added bool, err error) {
+func (cs *ConsensusState) addProposalBlockPart(msg *BlockPartMessage, peerID discover.NodeID) (added bool, err error) {
+	height, round, part := msg.Height, msg.Round, msg.Part
 	cs.logger.Trace("setProposalBlock", "msg", msg.Part, "peerID", peerID)
 
 	// Blocks might be reused, so round mismatch is OK
-	if !cs.Height.Equals(msg.Height) {
-		cs.logger.Debug("Received block from wrong height", "peerID", peerID, "msg.height", msg.Height, "msg.Round", msg.Round, "cs.Height", cs.Height, "cs.Round", cs.Round)
+	if cs.Height != height {
+		log.Debug("Received block part from wrong height", "height", height, "round", round)
 		return false, nil
 	}
 
+	// We're not expecting a block part.
 	if cs.ProposalBlockParts == nil {
 		// NOTE: this can happen when we've gone to a higher round and
 		// then receive parts from the previous round - not necessarily a bad peer.
-		cs.logger.Info("Received a block when we're not expecting any",
-			"peer", peerID, "height", msg.Height, "round", msg.Round)
+		log.Debug("Received a block part when we're not expecting any",
+			"height", height, "round", round, "index", part.Index, "peer", peerID)
 		return false, nil
 	}
 
-	return cs.setProposalBlockPart(msg.Height, msg.Round, msg.Part)
-}
-
-func (cs *ConsensusState) setProposalBlockPart(height *cmn.BigInt, round *cmn.BigInt, part *types.Part) (added bool, err error) {
 	added, err = cs.ProposalBlockParts.AddPart(part)
 	if err != nil {
 		return added, err
 	}
 	if added && cs.ProposalBlockParts.IsComplete() {
-		cs.ProposalBlock, err = MakeBlockFromPartSet(cs.ProposalBlockParts)
+		cs.ProposalBlock, err = types.MakeBlockFromPartSet(cs.ProposalBlockParts)
 		if err != nil {
-			return added, err
+			return true, err
 		}
 		// NOTE: it's possible to receive complete proposal blocks for future rounds without having the proposal
 		cs.logger.Info("Received complete proposal block", "height", cs.ProposalBlock.Height(), "hash", cs.ProposalBlock.Hash())
@@ -467,9 +391,10 @@ func (cs *ConsensusState) setProposalBlockPart(height *cmn.BigInt, round *cmn.Bi
 			// Move onto the next step
 			cs.enterPrevote(height, round)
 		} else if cs.Step == cstypes.RoundStepCommit {
+			// Waiting on the proposal block
 			cs.tryFinalizeCommit(height)
 		}
-		return added, nil
+		return true, nil
 	}
 	return added, nil
 }
@@ -587,9 +512,9 @@ func (cs *ConsensusState) addVote(vote *types.Vote, peerID discover.NodeID) (add
 				cs.ValidBlock = cs.ProposalBlock
 				cs.ValidBlockParts = cs.ProposalBlockParts
 			}
-			if !cs.ProposalBlockParts.HasHeader(blockID.PartsHeader) {
-				cs.ProposalBlockParts = types.NewPartSetFromHeader(blockID.PartsHeader)
-			}
+			// if !cs.ProposalBlockParts.HasHeader(blockID.PartsHeader) {
+			// 	cs.ProposalBlockParts = types.NewPartSetFromHeader(blockID.PartsHeader)
+			// }
 		}
 
 		// If +2/3 prevotes for *anything* for this or future round:
@@ -780,7 +705,6 @@ func (cs *ConsensusState) enterNewRound(height *cmn.BigInt, round *cmn.BigInt) {
 	cs.eventBus.PublishEventNewRound(cs.RoundStateEvent())
 
 	cs.beforeEnterProposal(height, round)
-	log.Error("Proposal block", cs.ProposalBlock.StringLong())
 }
 
 func (cs *ConsensusState) beforeEnterProposal(height *cmn.BigInt, round *cmn.BigInt) {
@@ -790,9 +714,6 @@ func (cs *ConsensusState) beforeEnterProposal(height *cmn.BigInt, round *cmn.Big
 		logger.Debug(cmn.Fmt("beforeEnterPropose(%v/%v): Invalid args. Current step: %v/%v/%v", height, round, cs.Height, cs.Round, cs.Step))
 		return
 	}
-
-	// If we don't get the proposal and block parts quick enough, enterPrevote
-	cs.scheduleTimeout(cs.config.Propose(round.Int32()), height, round, cstypes.RoundStepPropose)
 
 	inProgress := true
 
@@ -827,6 +748,8 @@ func (cs *ConsensusState) beforeEnterProposal(height *cmn.BigInt, round *cmn.Big
 		}
 	}
 	if !inProgress {
+		// If we don't get the proposal and block parts quick enough, enterPrevote
+		cs.scheduleTimeout(cs.config.Propose(round.Int32()), height, round, cstypes.RoundStepPropose)
 		cs.updateRoundStep(round, cstypes.RoundStepPropose)
 		cs.newStep()
 		// If we have the proposal + POL, then goto Prevote now.
@@ -868,6 +791,81 @@ func (cs *ConsensusState) enterPropose(height *cmn.BigInt, round *cmn.BigInt, bl
 	if cs.isProposer() {
 		cs.decideProposal(height, round, block, blockParts)
 	}
+}
+
+func (cs *ConsensusState) decideProposal(height *cmn.BigInt, round *cmn.BigInt, pBlock *types.Block, pBlockParts *types.PartSet) {
+	var block = pBlock
+	var blockParts = pBlockParts
+
+	// Decide on block
+	if cs.LockedBlock != nil {
+		// If we're locked onto a block, just choose that.
+		block, blockParts = cs.LockedBlock, cs.LockedBlockParts
+	} else if cs.ValidBlock != nil {
+		// If there is valid block, choose that.
+		block, blockParts = cs.ValidBlock, cs.ValidBlockParts
+	} else {
+		// Create a new proposal block from state/txs.
+		block, blockParts = cs.createProposalBlock()
+
+		if block == nil || blockParts == nil { // on error
+			cs.logger.Trace("Block or BlockParts is nil", "height", height, "round", round)
+			return
+		}
+	}
+
+	// Make proposal
+	polRound, polBlockID := cs.Votes.POLInfo()
+	proposal := types.NewProposal(height, round, blockParts.Header(), cmn.NewBigInt32(polRound), polBlockID)
+	if err := cs.privValidator.SignProposal(cs.state.ChainID, proposal); err == nil {
+
+		cs.logger.Info("Signed proposal", "height", height, "round", round, "proposal", proposal)
+		// Send proposal on internal msg queue
+		cs.sendInternalMessage(msgInfo{&ProposalMessage{proposal}, discover.ZeroNodeID()})
+		for i := 0; i < int(blockParts.Total()); i++ {
+			part := blockParts.GetPart(uint(i))
+			cs.sendInternalMessage(msgInfo{&BlockPartMessage{cs.Height, cs.Round, part}, discover.ZeroNodeID()})
+		}
+	}
+}
+
+func (cs *ConsensusState) setProposal(proposal *types.Proposal) error {
+	cs.logger.Trace("setProposal()", "proposal", proposal)
+
+	if cs.Proposal != nil {
+		cs.logger.Trace("cs.Proposal isn't nil. Returns early.")
+		return nil
+	}
+
+	// Does not apply
+	if !proposal.Height.Equals(cs.Height) || !proposal.Round.Equals(cs.Round) {
+		cs.logger.Trace(fmt.Sprintf("CS[%v/%v] doesn't match Proposal[%v/%v]", cs.Height, cs.Round, proposal.Height, proposal.Round))
+		return nil
+	}
+
+	// We don't care about the proposal if we're already in cstypes.RoundStepCommit.
+	if cstypes.RoundStepCommit <= cs.Step {
+		cs.logger.Trace("cs.Step is already beyond RoundStepCommit", "cs.Step", cs.Step)
+		return nil
+	}
+
+	// Verify POLRound, which must be -1 or between 0 and proposal.Round exclusive.
+	if !proposal.POLRound.EqualsInt(-1) &&
+		(proposal.POLRound.IsLessThanInt(0) || proposal.Round.IsLessThanOrEquals(proposal.POLRound)) {
+		cs.logger.Trace("Invalid proposal POLRound", "proposal.POLRound", proposal.POLRound, "proposal.Round", proposal.Round)
+		return ErrInvalidProposalPOLRound
+	}
+
+	// Verify signature
+	if !cs.Validators.GetProposer().VerifyProposalSignature(cs.state.ChainID, proposal) {
+		cs.logger.Trace("Verify proposal signature failed.")
+		return ErrInvalidProposalSignature
+	}
+
+	cs.Proposal = proposal
+	cs.ProposalBlockParts = types.NewPartSetFromHeader(proposal.BlockPartsHeader)
+	log.Debug("Received proposal", "proposal", proposal)
+	return nil
 }
 
 // Enter: `timeoutPropose` after entering Propose.
@@ -1039,7 +1037,7 @@ func (cs *ConsensusState) enterPrecommit(height *cmn.BigInt, round *cmn.BigInt) 
 	}
 
 	// If +2/3 prevoted for proposal block, stage and precommit it
-	if cs.ProposalBlock.HashesTo(blockID) {
+	if cs.ProposalBlock != nil && cs.ProposalBlock.HashesTo(blockID) {
 		logger.Info("enterPrecommit: +2/3 prevoted proposal block. Locking", "hash", blockID)
 		// Validate the block.
 		if err := state.ValidateBlock(cs.state, cs.ProposalBlock); err != nil {
@@ -1373,8 +1371,8 @@ func (cs *ConsensusState) handleMsg(mi msgInfo) {
 			cs.logger.Warn("TODO - punish peer.")
 		}
 	case *BlockPartMessage:
-		cs.logger.Trace("handling BlockMessage", "msg", msg.Part)
-		_, err = cs.handleBlockPartMessage(msg, peerID)
+		cs.logger.Trace("handling BlockPartMessage", "msg", msg.Part)
+		_, err = cs.addProposalBlockPart(msg, peerID)
 		if err != nil && !msg.Round.Equals(cs.Round) {
 			cs.logger.Debug("Received block part from wrong round", "height", cs.Height, "csRound", cs.Round, "blockRound", msg.Round)
 			err = nil

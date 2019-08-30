@@ -567,7 +567,6 @@ OUTER_LOOP:
 						Round:  rs.Round,  // This tells peer that this part applies to us.
 						Part:   part,
 					}
-					log.Trace("Sending block part", "height", prs.Height, "round", prs.Round)
 					if err := p2p.Send(ps.rw, service.CsBlockPartMsg, msg); err != nil {
 						ps.SetHasProposalBlockPart(prs.Height, prs.Round, index)
 					}
