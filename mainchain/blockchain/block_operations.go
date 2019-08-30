@@ -79,12 +79,15 @@ func (bo *BlockOperations) CreateProposalBlock(height int64, lastBlockID types.B
 	}
 	header.Root = stateRoot
 	block = bo.newBlock(header, txs, receipts, commit)
-	blockParts, err = types.MakePartSet(types.BlockPartSizeBytes, block)
+	if block != nil {
+		blockParts = types.MakePartSet(types.BlockPartSizeBytes, block)
+		return block, blockParts
+	}
 
 	bo.logger.Trace("Make block to propose", "block", block)
 	bo.saveReceipts(receipts, block)
 
-	return block, blockParts
+	return block, nil
 }
 
 // CommitAndValidateBlockTxs executes and commits the transactions in the given block.

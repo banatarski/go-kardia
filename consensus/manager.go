@@ -584,7 +584,7 @@ OUTER_LOOP:
 				panic(cmn.Fmt("Loading commit of previous block fails and returns nil. rs.Height=%v vs. prs.Height=%v", rs.Height, prs.Height))
 			}
 			if block.Height() != lastCommit.Height().Uint64() {
-				panic(cmn.Fmt("Loaded block's height and loaded lastCommit's height aren't the same: %v vs. %v", lastCommit.Height(), lastCommit.Height()))
+				panic(cmn.Fmt("Loaded block's height and loaded lastComm	it's height aren't the same: %v vs. %v", lastCommit.Height(), lastCommit.Height()))
 			}
 			logger.Trace("Sending BlockMessage for peer to catchup", "rsH/R", cmn.Fmt("%v/%v", rs.Height, rs.Round), "peerH/R", cmn.Fmt("%v/%v", prs.Height, prs.Round), "blockH/R", cmn.Fmt("%v/%v", prs.Height, lastCommit.Round()))
 			if err := p2p.Send(ps.rw, service.CsBlockMsg, &BlockMessage{Height: prs.Height, Round: lastCommit.Round(), Block: block}); err != nil {

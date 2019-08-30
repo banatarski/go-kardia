@@ -1266,7 +1266,8 @@ func (cs *ConsensusState) createProposalBlock() (block *types.Block, blockParts 
 		return nil, nil
 	}
 
-	return cs.blockOperations.CreateProposalBlock(cs.Height.Int64(), cs.state.LastBlockID, cs.state.LastValidators.Hash(), commit)
+	block, blockParts = cs.blockOperations.CreateProposalBlock(cs.Height.Int64(), cs.state.LastBlockID, cs.state.LastValidators.Hash(), commit)
+	return block, blockParts
 }
 
 // Returns true if the proposal block is complete &&

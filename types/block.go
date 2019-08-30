@@ -584,6 +584,44 @@ type PartSet struct {
 	count         uint
 }
 
+//MakeBlockFromPartSet makes partSet to block
+func MakeBlockFromPartSet(reader *PartSet) (*Block, error) {
+	if reader.IsComplete() {
+		maxsize := int64(MaxBlockBytes)
+		b := make([]byte, maxsize, maxsize)
+		// _, err := cdc.UnmarshalBinaryReader(reader.GetReader(), &b, maxsize)
+		// if err != nil {
+		// 	return nil, err
+		// }
+		// var block Block
+		// if err = rlp.DecodeBytes(b, &block); err != nil {
+		// 	return nil, err
+		// }
+		var block Block
+		err := rlp.DecodeBytes(b, &block)
+		if err != nil {
+			return nil, nil
+		}
+		return &block, nil
+	}
+	return nil, errors.New("Make block from partset not complete")
+}
+
+//MakePartSet makes block to partset
+func MakePartSet(partSize uint, block *Block) *PartSet {
+	// Prefix the byte length, so that unmarshaling
+	// can easily happen via a reader.
+	bzs, err := rlp.EncodeToBytes(block)
+	if err != nil {
+		panic(err)
+	}
+	// bz, err := cdc.MarshalBinary(bzs)
+	// if err != nil {
+	// 	return nil, err
+	// }
+	return NewPartSetFromData(bzs, partSize)
+}
+
 // NewPartSetFromData Returns an immutable, full PartSet from the data bytes.
 // The data bytes are split into "partSize" chunks, and merkle tree computed.
 func NewPartSetFromData(data []byte, partSize uint) *PartSet {
@@ -727,39 +765,6 @@ func (ps *PartSet) GetReader() io.Reader {
 		common.PanicSanity("Cannot GetReader() on incomplete PartSet")
 	}
 	return NewPartSetReader(ps.parts)
-}
-
-//MakePartSet makes block to partset
-func MakePartSet(partSize uint, block *Block) (*PartSet, error) {
-	// Prefix the byte length, so that unmarshaling
-	// can easily happen via a reader.
-	bzs, err := rlp.EncodeToBytes(block)
-	if err != nil {
-		panic(err)
-	}
-	bz, err := cdc.MarshalBinary(bzs)
-	if err != nil {
-		return nil, err
-	}
-	return NewPartSetFromData(bz, partSize), nil
-}
-
-//MakeBlockFromPartSet makes partSet to block
-func MakeBlockFromPartSet(reader *PartSet) (*Block, error) {
-	if reader.IsComplete() {
-		maxsize := int64(MaxBlockBytes)
-		b := make([]byte, maxsize, maxsize)
-		_, err := cdc.UnmarshalBinaryReader(reader.GetReader(), &b, maxsize)
-		if err != nil {
-			return nil, err
-		}
-		var block Block
-		if err = rlp.DecodeBytes(b, &block); err != nil {
-			return nil, err
-		}
-		return &block, nil
-	}
-	return nil, errors.New("Make block from partset not complete")
 }
 
 //PartSetReader struct
