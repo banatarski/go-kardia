@@ -876,11 +876,16 @@ type BlockMessage struct {
 	Block  *types.Block
 }
 
-// BlockPartMessage is sent when gossipping block.
+// BlockPartMessage is sent when gossipping block parts.
 type BlockPartMessage struct {
 	Height *cmn.BigInt
 	Round  *cmn.BigInt
 	Part   *types.Part
+}
+
+// String returns a string representation.
+func (m *BlockPartMessage) String() string {
+	return fmt.Sprintf("[BlockPart H:%v R:%v P:%v]", m.Height, m.Round, m.Part)
 }
 
 // String returns a string representation.

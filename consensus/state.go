@@ -362,6 +362,7 @@ func (cs *ConsensusState) addProposalBlockPart(msg *BlockPartMessage, peerID dis
 		return added, err
 	}
 	if added && cs.ProposalBlockParts.IsComplete() {
+		// If blockparts added and completed!
 		cs.ProposalBlock, err = types.MakeBlockFromPartSet(cs.ProposalBlockParts)
 		if err != nil {
 			return true, err
@@ -388,7 +389,6 @@ func (cs *ConsensusState) addProposalBlockPart(msg *BlockPartMessage, peerID dis
 		}
 
 		if cs.Step <= cstypes.RoundStepPropose && cs.isProposalComplete() {
-			// Move onto the next step
 			cs.enterPrevote(height, round)
 		} else if cs.Step == cstypes.RoundStepCommit {
 			// Waiting on the proposal block
@@ -806,7 +806,8 @@ func (cs *ConsensusState) decideProposal(height *cmn.BigInt, round *cmn.BigInt, 
 		block, blockParts = cs.ValidBlock, cs.ValidBlockParts
 	} else {
 		// Create a new proposal block from state/txs.
-		block, blockParts = cs.createProposalBlock()
+		// We don't want to create new block here, instead peers will get the proposal blockparts
+		// block, blockParts = cs.createProposalBlock()
 
 		if block == nil || blockParts == nil { // on error
 			cs.logger.Trace("Block or BlockParts is nil", "height", height, "round", round)
@@ -826,6 +827,8 @@ func (cs *ConsensusState) decideProposal(height *cmn.BigInt, round *cmn.BigInt, 
 			part := blockParts.GetPart(uint(i))
 			cs.sendInternalMessage(msgInfo{&BlockPartMessage{cs.Height, cs.Round, part}, discover.ZeroNodeID()})
 		}
+	} else {
+		log.Warn("enterPropose: Proposal error", "height", height, "round", round, "err", err)
 	}
 }
 
@@ -939,7 +942,7 @@ func (cs *ConsensusState) doPrevote(height *cmn.BigInt, round *cmn.BigInt) {
 	// NOTE: the proposal signature is validated when it is received,
 	// and the proposal block is validated as it is received (against the merkle hash in the proposal)
 	logger.Info("enterPrevote: ProposalBlock is valid")
-	cs.signAddVote(types.VoteTypePrevote, cs.ProposalBlock.BlockHash(), cs.ProposalBlockParts.Header())
+	cs.signAddVote(types.VoteTypePrevote, cs.ProposalBlock.Hash(), cs.ProposalBlockParts.Header())
 }
 
 // Enter: any +2/3 prevotes at next round.
@@ -1127,12 +1130,20 @@ func (cs *ConsensusState) enterCommit(height *cmn.BigInt, commitRound *cmn.BigIn
 
 	// If we don't have the block being committed, set up to get it.
 	// cs.ProposalBlock is confirmed not nil from caller.
-	if !cs.ProposalBlock.HashesTo(blockID) || !cs.ProposalBlockParts.HasHeader(blockID.PartsHeader) {
-		logger.Info("Commit is for a block we don't know about. Set ProposalBlock=nil", "commit", blockID)
-		// We're getting the wrong block.
-		// Set up ProposalBlock and keep waiting.
-		cs.ProposalBlock = nil
-		cs.ProposalBlockParts = types.NewPartSetFromHeader(blockID.PartsHeader)
+	if cs.ProposalBlock != nil {
+		if !cs.ProposalBlock.HashesTo(blockID) {
+			if !cs.ProposalBlockParts.HasHeader(blockID.PartsHeader) {
+				logger.Info("enterCommit is for a block we don't know about. Set ProposalBlock=nil", "commit", blockID)
+				// We're getting the wrong block.
+				// Set up ProposalBlock and keep waiting.
+				cs.ProposalBlock = nil
+				cs.ProposalBlockParts = types.NewPartSetFromHeader(blockID.PartsHeader)
+			} else {
+				// We just need to keep waiting.
+			}
+		}
+	} else {
+		log.Debug("enterCommit failed. There was ProposalBlock, that for <nil>.")
 	}
 }
 
@@ -1362,16 +1373,24 @@ func (cs *ConsensusState) handleMsg(mi msgInfo) {
 	case *ProposalMessage:
 		cs.logger.Trace("handling ProposalMessage", "ProposalMessage", msg.Proposal)
 		err = cs.setProposal(msg.Proposal)
+		if err != nil {
+			log.Warn("SetProposal", "Warning", err)
+		}
 	case *VoteMessage:
 		// attempt to add the vote and dupeout the validator if its a duplicate signature
 		// if the vote gives us a 2/3-any or 2/3-one, we transition
 		cs.logger.Trace("handling AddVote", "VoteMessage", msg.Vote)
 		err := cs.tryAddVote(msg.Vote, peerID)
 		if err == ErrAddingVote {
-			cs.logger.Trace("trying to add vote failed", "err", err)
-			cs.logger.Warn("TODO - punish peer.")
+			cs.logger.Trace("Trying to add vote failed", "err", err)
+			// cs.logger.Warn("TODO - punish peer.")
+			// TODO: punish peer
+			// We probably don't want to stop the peer here. The vote does not
+			// necessarily comes from a malicious peer but can be just broadcasted by
+			// a typical peer.
 		}
 	case *BlockPartMessage:
+		// If the proposal is complete, we'll enterPrevote or tryFinalizeCommit
 		cs.logger.Trace("handling BlockPartMessage", "msg", msg.Part)
 		_, err = cs.addProposalBlockPart(msg, peerID)
 		if err != nil && !msg.Round.Equals(cs.Round) {
