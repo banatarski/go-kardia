@@ -716,20 +716,20 @@ func (cs *ConsensusState) beforeEnterProposal(height *cmn.BigInt, round *cmn.Big
 	}
 
 	inProgress := true
-
 	// TODO(namdoh): For now this any node is a validator. Remove it once we
 	// restrict who can be validator.
 	// Nothing more to do if we're not a validator
 	if cs.privValidator == nil {
 		logger.Debug("This node is not a validator")
-		return
-	}
-	// if not a validator, we're done
-	if !cs.Validators.HasAddress(cs.privValidator.GetAddress()) {
-		logger.Debug("This node is not a validator", "addr", cs.privValidator.GetAddress(), "vals", cs.Validators)
 		inProgress = false
-	} else if !cs.isProposer() {
-		inProgress = false
+	} else {
+		// if not a validator, we're done
+		if !cs.Validators.HasAddress(cs.privValidator.GetAddress()) {
+			logger.Debug("This node is not a validator", "addr", cs.privValidator.GetAddress(), "vals", cs.Validators)
+			inProgress = false
+		} else if !cs.isProposer() {
+			inProgress = false
+		}
 	}
 
 	var block *types.Block
@@ -759,7 +759,6 @@ func (cs *ConsensusState) beforeEnterProposal(height *cmn.BigInt, round *cmn.Big
 			cs.enterPrevote(height, cs.Round)
 		}
 	}
-
 	cs.enterPropose(height, round, block, blockParts)
 }
 
@@ -787,16 +786,14 @@ func (cs *ConsensusState) enterPropose(height *cmn.BigInt, round *cmn.BigInt, bl
 			cs.enterPrevote(height, cs.Round)
 		}
 	}()
-
 	if cs.isProposer() {
 		cs.decideProposal(height, round, block, blockParts)
 	}
 }
 
-func (cs *ConsensusState) decideProposal(height *cmn.BigInt, round *cmn.BigInt, pBlock *types.Block, pBlockParts *types.PartSet) {
-	var block = pBlock
-	var blockParts = pBlockParts
-
+func (cs *ConsensusState) decideProposal(height *cmn.BigInt, round *cmn.BigInt, proposalBlock *types.Block, proposalBlockParts *types.PartSet) {
+	var block = proposalBlock
+	var blockParts = proposalBlockParts
 	// Decide on block
 	if cs.LockedBlock != nil {
 		// If we're locked onto a block, just choose that.
@@ -819,7 +816,6 @@ func (cs *ConsensusState) decideProposal(height *cmn.BigInt, round *cmn.BigInt, 
 	polRound, polBlockID := cs.Votes.POLInfo()
 	proposal := types.NewProposal(height, round, blockParts.Header(), cmn.NewBigInt32(polRound), polBlockID)
 	if err := cs.privValidator.SignProposal(cs.state.ChainID, proposal); err == nil {
-
 		cs.logger.Info("Signed proposal", "height", height, "round", round, "proposal", proposal)
 		// Send proposal on internal msg queue
 		cs.sendInternalMessage(msgInfo{&ProposalMessage{proposal}, discover.ZeroNodeID()})
@@ -835,7 +831,7 @@ func (cs *ConsensusState) decideProposal(height *cmn.BigInt, round *cmn.BigInt, 
 func (cs *ConsensusState) setProposal(proposal *types.Proposal) error {
 	cs.logger.Trace("setProposal()", "proposal", proposal)
 
-	if cs.Proposal != nil {
+	if cs.Proposal != nil || proposal == nil {
 		cs.logger.Trace("cs.Proposal isn't nil. Returns early.")
 		return nil
 	}

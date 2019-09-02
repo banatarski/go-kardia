@@ -79,13 +79,15 @@ func (bo *BlockOperations) CreateProposalBlock(height int64, lastBlockID types.B
 	}
 	header.Root = stateRoot
 	block = bo.newBlock(header, txs, receipts, commit)
-	if block != nil {
-		blockParts = types.MakePartSet(types.BlockPartSizeBytes, block)
-		return block, blockParts
-	}
 
 	bo.logger.Trace("Make block to propose", "block", block)
 	bo.saveReceipts(receipts, block)
+
+	if block != nil {
+		bo.logger.Trace("Make part set from block", "blockParts", blockParts)
+		blockParts = types.MakePartSet(types.BlockPartSizeBytes, block)
+		return block, blockParts
+	}
 
 	return block, nil
 }
