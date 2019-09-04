@@ -112,13 +112,14 @@ func (rs *RoundState) RoundStateEvent() types.EventDataRoundState {
 }
 
 func (rs *RoundState) String() string {
-	return fmt.Sprintf("RoundState{H:%v R:%v S:%v  StartTime:%v  CommitTime:%v  Validators:%v   Proposal:%v  ProposalBlock:%v  LockedRound:%v  LockedBlock:%v  ValidRound:%v  ValidBlock:%v  Votes:%v  LastCommit:%v  LastValidators:%v}",
+	return fmt.Sprintf("RoundState{H:%v R:%v S:%v  StartTime:%v  CommitTime:%v  Validators:%v   Proposal:%v  ProposalBlock:%v  ProposalBlockPart:%v  LockedRound:%v  LockedBlock:%v  ValidRound:%v  ValidBlock:%v  Votes:%v  LastCommit:%v  LastValidators:%v}",
 		rs.Height, rs.Round, rs.Step,
 		time.Unix(rs.StartTime.Int64(), 0),
 		time.Unix(rs.CommitTime.Int64(), 0),
 		rs.Validators,
 		rs.Proposal,
 		rs.ProposalBlock,
+		rs.ProposalBlockParts.StringShort(),
 		rs.LockedRound,
 		rs.LockedBlock,
 		rs.ValidRound,

@@ -338,7 +338,7 @@ func (cs *ConsensusState) reconstructLastCommit(state state.LastestBlockState) {
 
 // NOTE: block is not necessarily valid.
 // Asynchronously triggers either enterPrevote (before we timeout of propose) or tryFinalizeCommit, once we have the full block.
-func (cs *ConsensusState) addProposalBlockPart(msg *BlockPartMessage, peerID discover.NodeID) (added bool, err error) {
+func (cs *ConsensusState) setProposalBlockPart(msg *BlockPartMessage, peerID discover.NodeID) (added bool, err error) {
 	height, round, part := msg.Height, msg.Round, msg.Part
 	cs.logger.Trace("setProposalBlock", "msg", msg.Part, "peerID", peerID)
 
@@ -450,7 +450,6 @@ func (cs *ConsensusState) addVote(vote *types.Vote, peerID discover.NodeID) (add
 			// cs.scheduleTimeout(time.Duration(0), cs.Height, 0, cstypes.RoundStepNewHeight)
 			cs.enterNewRound(cs.Height, cmn.NewBigInt32(0))
 		}
-
 		return
 	}
 
@@ -709,9 +708,8 @@ func (cs *ConsensusState) enterNewRound(height *cmn.BigInt, round *cmn.BigInt) {
 
 func (cs *ConsensusState) beforeEnterProposal(height *cmn.BigInt, round *cmn.BigInt) {
 	logger := cs.logger.New("height", height, "round", round)
-
 	if !cs.Height.Equals(height) || round.IsLessThan(cs.Round) || (cs.Round.Equals(round) && cstypes.RoundStepPropose <= cs.Step) {
-		logger.Debug(cmn.Fmt("beforeEnterPropose(%v/%v): Invalid args. Current step: %v/%v/%v", height, round, cs.Height, cs.Round, cs.Step))
+		logger.Debug(cmn.Fmt("beforeEnterProposal(%v/%v): Invalid args. Current step: %v/%v/%v", height, round, cs.Height, cs.Round, cs.Step))
 		return
 	}
 
@@ -736,15 +734,14 @@ func (cs *ConsensusState) beforeEnterProposal(height *cmn.BigInt, round *cmn.Big
 	var blockParts *types.PartSet
 
 	if inProgress {
+		// Get the block
 		block, blockParts = cs.createProposalBlock()
 		if block == nil {
 			log.Debug("createProposalBlock", "height:", height, "round:", round)
 			inProgress = false
-		} else if block != nil {
-			if height != cmn.NewBigUint64(block.Height()) {
-				log.Debug("Height not match", "cs.Height", height, "block.height", block.Height())
-				inProgress = false
-			}
+		} else if block != nil && !height.EqualsUint64(block.Height()) {
+			log.Debug("Height not match", "cs.Height", height, "block.height", block.Height())
+			inProgress = false
 		}
 	}
 	if !inProgress {
@@ -758,6 +755,7 @@ func (cs *ConsensusState) beforeEnterProposal(height *cmn.BigInt, round *cmn.Big
 		if cs.isProposalComplete() {
 			cs.enterPrevote(height, cs.Round)
 		}
+		return
 	}
 	cs.enterPropose(height, round, block, blockParts)
 }
@@ -906,7 +904,7 @@ func (cs *ConsensusState) doPrevote(height *cmn.BigInt, round *cmn.BigInt) {
 	// If a block is locked, prevote that.
 	if cs.LockedBlock != nil {
 		logger.Info("enterPrevote: Block was locked")
-		cs.signAddVote(types.VoteTypePrevote, cs.LockedBlock.BlockHash(), cs.LockedBlockParts.Header())
+		cs.signAddVote(types.VoteTypePrevote, cs.LockedBlock.Hash(), cs.LockedBlockParts.Header())
 		return
 	}
 
@@ -930,9 +928,9 @@ func (cs *ConsensusState) doPrevote(height *cmn.BigInt, round *cmn.BigInt) {
 		logger.Error("enterPrevote: fail to commit & verify txs", "err", err)
 		cs.signAddVote(types.VoteTypePrevote, cmn.NewZeroHash(), types.PartSetHeader{})
 		return
-	} else {
-		logger.Info("enterPrevote: successfully executes and commits block txs")
 	}
+
+	logger.Info("enterPrevote: successfully executes and commits block txs")
 
 	// Prevote cs.ProposalBlock
 	// NOTE: the proposal signature is validated when it is received,
@@ -1119,7 +1117,7 @@ func (cs *ConsensusState) enterCommit(height *cmn.BigInt, commitRound *cmn.BigIn
 	// Move them over to ProposalBlock if they match the commit hash,
 	// otherwise they'll be cleared in updateToState.
 	if cs.LockedBlock != nil && cs.LockedBlock.HashesTo(blockID) {
-		logger.Info("Commit is for locked block. Set ProposalBlock=LockedBlock", "blockHash", blockID)
+		logger.Info("Commit is for locked block. Set ProposalBlock=LockedBlock", "Hash", blockID.Hash.String)
 		cs.ProposalBlock = cs.LockedBlock
 		cs.ProposalBlockParts = cs.LockedBlockParts
 	}
@@ -1380,7 +1378,6 @@ func (cs *ConsensusState) handleMsg(mi msgInfo) {
 		if err == ErrAddingVote {
 			cs.logger.Trace("Trying to add vote failed", "err", err)
 			// cs.logger.Warn("TODO - punish peer.")
-			// TODO: punish peer
 			// We probably don't want to stop the peer here. The vote does not
 			// necessarily comes from a malicious peer but can be just broadcasted by
 			// a typical peer.
@@ -1388,7 +1385,7 @@ func (cs *ConsensusState) handleMsg(mi msgInfo) {
 	case *BlockPartMessage:
 		// If the proposal is complete, we'll enterPrevote or tryFinalizeCommit
 		cs.logger.Trace("handling BlockPartMessage", "msg", msg.Part)
-		_, err = cs.addProposalBlockPart(msg, peerID)
+		_, err = cs.setProposalBlockPart(msg, peerID)
 		if err != nil && !msg.Round.Equals(cs.Round) {
 			cs.logger.Debug("Received block part from wrong round", "height", cs.Height, "csRound", cs.Round, "blockRound", msg.Round)
 			err = nil

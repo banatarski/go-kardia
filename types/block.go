@@ -847,7 +847,7 @@ func (blockID BlockID) StringLong() string {
 	return common.Hash(blockID.Hash).Hex()
 }
 
-// BlockID return Hash of a block
+// BlockHash return Hash of a block
 func (b *Block) BlockHash() common.Hash {
 	return b.Hash()
 }

@@ -533,7 +533,7 @@ func makeRoundStepMessages(rs *cstypes.RoundState) (nrsMsg *NewRoundStepMessage,
 		SecondsSinceStartTime: uint(time.Now().Unix() - rs.StartTime.Int64()),
 		LastCommitRound:       rs.LastCommit.Round(),
 	}
-	if rs.Step == cstypes.RoundStepCommit && rs.ProposalBlock != nil {
+	if rs.Step == cstypes.RoundStepCommit && rs.ProposalBlockParts != nil {
 		csMsg = &CommitStepMessage{
 			Height:           rs.Height,
 			BlockPartsHeader: rs.ProposalBlockParts.Header(),
@@ -584,19 +584,25 @@ OUTER_LOOP:
 				panic(cmn.Fmt("Loading commit of previous block fails and returns nil. rs.Height=%v vs. prs.Height=%v", rs.Height, prs.Height))
 			}
 			if block.Height() != lastCommit.Height().Uint64() {
-				panic(cmn.Fmt("Loaded block's height and loaded lastComm	it's height aren't the same: %v vs. %v", lastCommit.Height(), lastCommit.Height()))
+				panic(cmn.Fmt("Loaded block's height and loaded lastCommit's height aren't the same: %v vs. %v", lastCommit.Height(), lastCommit.Height()))
 			}
-			logger.Trace("Sending BlockMessage for peer to catchup", "rsH/R", cmn.Fmt("%v/%v", rs.Height, rs.Round), "peerH/R", cmn.Fmt("%v/%v", prs.Height, prs.Round), "blockH/R", cmn.Fmt("%v/%v", prs.Height, lastCommit.Round()))
-			if err := p2p.Send(ps.rw, service.CsBlockMsg, &BlockMessage{Height: prs.Height, Round: lastCommit.Round(), Block: block}); err != nil {
-				logger.Trace("Sending block message failed", "err", err)
+			// logger.Trace("Sending BlockMessage for peer to catchup", "rsH/R", cmn.Fmt("%v/%v", rs.Height, rs.Round), "peerH/R", cmn.Fmt("%v/%v", prs.Height, prs.Round), "blockH/R", cmn.Fmt("%v/%v", prs.Height, lastCommit.Round()))
+			// // if err := p2p.Send(ps.rw, service.CsBlockMsg, &BlockMessage{Height: prs.Height, Round: lastCommit.Round(), Block: block}); err != nil {
+			// // 	logger.Trace("Sending block message failed", "err", err)
+			// // }
+
+			logger.Trace("Sending BlockPartMessage for peer to catchup", "rsH/R", cmn.Fmt("%v/%v", rs.Height, rs.Round), "peerH/R", cmn.Fmt("%v/%v", prs.Height, prs.Round), "blockH/R", cmn.Fmt("%v/%v", prs.Height, lastCommit.Round()))
+			if prs.ProposalBlockParts == nil {
+
 			}
+
 			time.Sleep(conR.conS.config.PeerGossipSleep())
 			continue OUTER_LOOP
 		}
 
 		// If height and round don't match, sleep.
 		if !rs.Height.Equals(prs.Height) || !rs.Round.Equals(prs.Round) {
-			//logger.Trace("Peer Height|Round mismatch, sleeping", "peerHeight", prs.Height, "peerRound", prs.Round, "peer", peer)
+			//logger.Trace("Peer Height|Round mismatch, sleeping", "peerHeight" , prs.Height, "peerRound", prs.Round, "peer", peer)
 			time.Sleep(conR.conS.config.PeerGossipSleep())
 			continue OUTER_LOOP
 		}
@@ -1008,7 +1014,6 @@ func (ps *PeerState) SetHasProposal(proposal *types.Proposal) {
 	if ps.PRS.Proposal {
 		return
 	}
-
 	if ps.PRS.ProposalBlockParts != nil {
 		return
 	}
