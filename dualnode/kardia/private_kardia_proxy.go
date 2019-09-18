@@ -25,6 +25,9 @@ package kardia
 import (
 	"errors"
 	"fmt"
+	"math/big"
+	"strings"
+
 	"github.com/kardiachain/go-kardia/configs"
 	"github.com/kardiachain/go-kardia/dualchain/event_pool"
 	"github.com/kardiachain/go-kardia/dualnode/utils"
@@ -36,11 +39,11 @@ import (
 	"github.com/kardiachain/go-kardia/lib/log"
 	"github.com/kardiachain/go-kardia/mainchain/tx_pool"
 	"github.com/kardiachain/go-kardia/types"
-	"math/big"
-	"strings"
+
 )
 
 const PRIVATE_KARDIA = "PRIVATE"
+
 var ErrInsufficientCandidateRequestData = errors.New("insufficient candidate request data")
 var ErrInsufficientCandidateResponseData = errors.New("insufficient candidate response data")
 var ErrUnpackForwardRequestInfo = errors.New("error unpacking info forward request input")
@@ -287,7 +290,8 @@ func (p *PrivateKardiaProxy) ExtractKardiaTxSummary(tx *types.Transaction) (type
 	case configs.KardiaForwardRequestFunction:
 		candidateRequestData := make([][]byte, configs.KardiaForwardRequestFields)
 		var incomingRequest KardiaForwardRequestInput
-		err = p.smcABI.UnpackInput(&incomingRequest, configs.KardiaForwardRequestFunction, input[4:])
+		incomingRequestMap := common.Map(incomingRequest)
+		err = p.smcABI.UnpackIntoMap(incomingRequestMap, configs.KardiaForwardRequestFunction, input[4:])
 		if err != nil {
 			log.Error("Error unpack forward request input,", "tx", tx, "err", err)
 			return types.EventSummary{}, ErrUnpackForwardRequestInfo
@@ -303,7 +307,8 @@ func (p *PrivateKardiaProxy) ExtractKardiaTxSummary(tx *types.Transaction) (type
 	case configs.KardiaForwardResponseFunction:
 		forwardedResponseData := make([][]byte, configs.KardiaForwardResponseFields)
 		var forwardResponseInput KardiaForwardResponseInput
-		err = p.smcABI.UnpackInput(&forwardResponseInput, configs.KardiaForwardResponseFunction, input[4:])
+		forwardResponseInputMap := common.Map(forwardResponseInput)
+		err = p.smcABI.UnpackIntoMap(forwardResponseInputMap, configs.KardiaForwardResponseFunction, input[4:])
 		if err != nil {
 			log.Error("Error unpack forward request input,", "tx", tx, "err", err)
 			return types.EventSummary{}, ErrUnpackForwardResponseInfo
