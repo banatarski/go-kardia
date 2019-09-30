@@ -186,25 +186,13 @@ func (db *Store)WriteBlock(block *types.Block) {
 		if e := db.insertBlock(mongoDb, ctx, newBlock); e != nil {
 			return e
 		}
-		go func() {
-			if block.NumTxs() > 0 {
-				txs := make([]*Transaction, 0)
-				for i, tx := range block.Transactions() {
-					newTx, err := NewTransaction(tx, newBlock.Height, newBlock.Hash, i)
-					if err != nil {
-						log.Error("error while convert transaction", "err", err)
-						continue
-					}
-					txs = append(txs, newTx)
+		if block.NumTxs() > 0 {
+			go func() {
+				if err := db.insertTransactions(block.Transactions(), newBlock.Height, newBlock.Hash); err != nil {
+					log.Error("error while insert new transactions", "err", err, "block", block.Height())
 				}
-				if len(txs) > 0 {
-					// insert many transactions
-					if err := db.insertTransactions(txs); err != nil {
-						log.Error("error while insert new transactions", "err", err, "block", block.Height())
-					}
-				}
-			}
-		} ()
+			} ()
+		}
 		return nil
 	}); err != nil {
 		log.Error("error while insert new block", "err", err)
@@ -1007,15 +995,19 @@ func (db *Store)getTransactionByHash(mongoDb *mongo.Database, ctx *context.Conte
 	return &tx, nil
 }
 
-func (db *Store)insertTransactions(transactions []*Transaction) error {
+func (db *Store)insertTransactions(transactions types.Transactions, blockHeight uint64, blockHash string) error {
 	return db.execute(func(mongoDb *mongo.Database, ctx *context.Context) error {
 		txs := make([]interface{}, 0)
-		for _, t := range transactions {
-			if _, err := db.getTransactionByHash(mongoDb, ctx, t.Hash); err != nil {
-				txs = append(txs, t)
+		for i, tx := range transactions {
+			if _, err := db.getTransactionByHash(mongoDb, ctx, tx.Hash().Hex()); err != nil {
+				newTx, err := NewTransaction(tx, blockHeight, blockHash, i)
+				if err != nil {
+					log.Error("error while convert transaction", "err", err)
+					continue
+				}
+				txs = append(txs, newTx)
 			}
 		}
-
 		if len(txs) > 0 {
 			_, e := mongoDb.Collection(txTable).InsertMany(*ctx, txs)
 			return e
