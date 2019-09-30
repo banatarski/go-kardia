@@ -186,21 +186,25 @@ func (db *Store)WriteBlock(block *types.Block) {
 		if e := db.insertBlock(mongoDb, ctx, newBlock); e != nil {
 			return e
 		}
-		if block.NumTxs() > 0 {
-			txs := make([]*Transaction, 0)
-			for i, tx := range block.Transactions() {
-				newTx, err := NewTransaction(tx, newBlock.Height, newBlock.Hash, i)
-				if err != nil {
-					log.Error("error while convert transaction", "err", err)
-					continue
+		go func() {
+			if block.NumTxs() > 0 {
+				txs := make([]*Transaction, 0)
+				for i, tx := range block.Transactions() {
+					newTx, err := NewTransaction(tx, newBlock.Height, newBlock.Hash, i)
+					if err != nil {
+						log.Error("error while convert transaction", "err", err)
+						continue
+					}
+					txs = append(txs, newTx)
 				}
-				txs = append(txs, newTx)
+				if len(txs) > 0 {
+					// insert many transactions
+					if err := db.insertTransactions(txs); err != nil {
+						log.Error("error while insert new transactions", "err", err, "block", block.Height())
+					}
+				}
 			}
-			if len(txs) > 0 {
-				// insert many transactions
-				return db.insertTransactions(txs)
-			}
-		}
+		} ()
 		return nil
 	}); err != nil {
 		log.Error("error while insert new block", "err", err)
