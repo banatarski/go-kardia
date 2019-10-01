@@ -188,7 +188,7 @@ func (db *Store)WriteBlock(block *types.Block) {
 		}
 		if block.NumTxs() > 0 {
 			go func() {
-				if err := db.insertTransactions(block.Transactions(), newBlock.Height, newBlock.Hash); err != nil {
+				if err := db.insertTransactions(mongoDb, ctx, block.Transactions(), newBlock.Height, newBlock.Hash); err != nil {
 					log.Error("error while insert new transactions", "err", err, "block", block.Height())
 				}
 			} ()
@@ -329,11 +329,14 @@ func (db *Store)setHeadHeaderHash(hash string) error {
 
 // WriteReceipts stores all the transaction receipts belonging to a block.
 func (db *Store)WriteReceipts(hash common.Hash, height uint64, receipts types.Receipts) {
-	if err := db.execute(func(mongoDb *mongo.Database, ctx *context.Context) error {
-		return db.insertReceipts(mongoDb, hash.Hex(), height, receipts)
-	}); err != nil {
-		log.Error("error while writing receipts", "err", err, "height", height)
-	}
+	// add this process into goroutine in order to prevent slow sync processes
+	go func() {
+		if err := db.execute(func(mongoDb *mongo.Database, ctx *context.Context) error {
+			return db.insertReceipts(mongoDb, hash.Hex(), height, receipts)
+		}); err != nil {
+			log.Error("error while writing receipts", "err", err, "height", height)
+		}
+	}()
 }
 
 // WriteCanonicalHash stores the hash assigned to a canonical block height.
@@ -995,25 +998,23 @@ func (db *Store)getTransactionByHash(mongoDb *mongo.Database, ctx *context.Conte
 	return &tx, nil
 }
 
-func (db *Store)insertTransactions(transactions types.Transactions, blockHeight uint64, blockHash string) error {
-	return db.execute(func(mongoDb *mongo.Database, ctx *context.Context) error {
-		txs := make([]interface{}, 0)
-		for i, tx := range transactions {
-			if _, err := db.getTransactionByHash(mongoDb, ctx, tx.Hash().Hex()); err != nil {
-				newTx, err := NewTransaction(tx, blockHeight, blockHash, i)
-				if err != nil {
-					log.Error("error while convert transaction", "err", err)
-					continue
-				}
-				txs = append(txs, newTx)
+func (db *Store)insertTransactions(mongoDb *mongo.Database, ctx *context.Context, transactions types.Transactions, blockHeight uint64, blockHash string) error {
+	txs := make([]interface{}, 0)
+	for i, tx := range transactions {
+		if _, err := db.getTransactionByHash(mongoDb, ctx, tx.Hash().Hex()); err != nil {
+			newTx, err := NewTransaction(tx, blockHeight, blockHash, i)
+			if err != nil {
+				log.Error("error while convert transaction", "err", err)
+				continue
 			}
+			txs = append(txs, newTx)
 		}
-		if len(txs) > 0 {
-			_, e := mongoDb.Collection(txTable).InsertMany(*ctx, txs)
-			return e
-		}
-		return nil
-	})
+	}
+	if len(txs) > 0 {
+		_, e := mongoDb.Collection(txTable).InsertMany(*ctx, txs)
+		return e
+	}
+	return nil
 }
 
 func (db *Store) getCommitById(mongoDb *mongo.Database, ctx *context.Context, blockId uint64) (*Commit, error) {
