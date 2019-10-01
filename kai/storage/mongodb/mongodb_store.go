@@ -44,7 +44,7 @@ type Store struct {
 func NewClient(uri string) (*mongo.Client, *context.Context, context.CancelFunc, error) {
 	// add timeout for context
 	// TODO: move timeout to config
-	ctx, cancelCtx := context.WithTimeout(context.Background(), 50*time.Second)
+	ctx, cancelCtx := context.WithTimeout(context.Background(), 5*time.Minute)
 	if client == nil {
 		var err error
 		client, err = mongo.Connect(ctx, options.Client().ApplyURI(uri))
@@ -57,7 +57,7 @@ func NewClient(uri string) (*mongo.Client, *context.Context, context.CancelFunc,
 
 // TODO: add more config for db connection
 func NewDB(uri, dbName string, drop bool) (*Store, error) {
-	client, _, cancelCtxFunc, err := NewClient(uri)
+	client, ctx, cancelCtxFunc, err := NewClient(uri)
 	if err != nil {
 		return nil, err
 	}
@@ -65,7 +65,7 @@ func NewDB(uri, dbName string, drop bool) (*Store, error) {
 	db := client.Database(dbName)
 
 	if drop {
-		if err := db.Drop(context.Background()); err != nil {
+		if err := db.Drop(*ctx); err != nil {
 			return nil, err
 		}
 	}
@@ -149,7 +149,7 @@ func (db *Store) Put(key, value interface{}) error {
 			return err
 		}
 		return db.execute(func(mongoDb *mongo.Database, ctx *context.Context) error {
-			_, e := mongoDb.Collection(trieTable).InsertOne(context.Background(), document)
+			_, e := mongoDb.Collection(trieTable).InsertOne(*ctx, document)
 			return e
 		})
 	}
@@ -199,9 +199,9 @@ func (db *Store)WriteBlock(block *types.Block) {
 	}
 }
 
-func (db *Store)getReceiptByTxHash(mongoDb *mongo.Database, hash string) (*Receipt, error) {
+func (db *Store)getReceiptByTxHash(mongoDb *mongo.Database, ctx *context.Context, hash string) (*Receipt, error) {
 	cur := mongoDb.Collection(receiptTable).FindOne(
-		context.Background(),
+		*ctx,
 		bson.M{txHash: bsonx.String(hash)},
 	)
 	var r Receipt
@@ -212,13 +212,13 @@ func (db *Store)getReceiptByTxHash(mongoDb *mongo.Database, hash string) (*Recei
 	return &r, nil
 }
 
-func (db *Store) getReceiptsByBlockHash(mongoDb *mongo.Database, hash common.Hash) ([]*Receipt, error) {
-	cur, err := mongoDb.Collection(receiptTable).Find(context.Background(), bson.M{"blockHash": bsonx.String(hash.Hex())})
+func (db *Store) getReceiptsByBlockHash(mongoDb *mongo.Database, ctx *context.Context, hash common.Hash) ([]*Receipt, error) {
+	cur, err := mongoDb.Collection(receiptTable).Find(*ctx, bson.M{"blockHash": bsonx.String(hash.Hex())})
 	if err != nil {
 		return nil, err
 	}
 	receipts := make([]*Receipt, 0)
-	for cur.Next(context.Background()) {
+	for cur.Next(*ctx) {
 		var r Receipt
 		if err := cur.Decode(&r); err != nil {
 			return nil, err
@@ -228,26 +228,26 @@ func (db *Store) getReceiptsByBlockHash(mongoDb *mongo.Database, hash common.Has
 	return receipts, nil
 }
 
-func (db *Store)insertReceipts(mongoDb *mongo.Database, hash string, height uint64, receipts types.Receipts) error {
+func (db *Store)insertReceipts(mongoDb *mongo.Database, ctx *context.Context, hash string, height uint64, receipts types.Receipts) error {
 	newReceipts := make([]interface{}, 0)
 	for _, receipt := range receipts {
-		if _, err := db.getReceiptByTxHash(mongoDb, receipt.TxHash.Hex()); err != nil {
+		if _, err := db.getReceiptByTxHash(mongoDb, ctx, receipt.TxHash.Hex()); err != nil {
 			r := NewReceipt(receipt, height, hash)
 			newReceipts = append(newReceipts, r)
 		}
 	}
 
 	if len(newReceipts) > 0 {
-		if _, err := mongoDb.Collection(receiptTable).InsertMany(context.Background(), newReceipts); err != nil {
+		if _, err := mongoDb.Collection(receiptTable).InsertMany(*ctx, newReceipts); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (db *Store)getHeadHeaderHash(mongoDb *mongo.Database) (*HeadHeaderHash, error) {
+func (db *Store)getHeadHeaderHash(mongoDb *mongo.Database, ctx *context.Context) (*HeadHeaderHash, error) {
 	cur := mongoDb.Collection(headHeaderTable).FindOne(
-		context.Background(),
+		*ctx,
 		bson.M{"ID": bsonx.Int32(1)},
 	)
 	var r HeadHeaderHash
@@ -261,7 +261,7 @@ func (db *Store)getHeadHeaderHash(mongoDb *mongo.Database) (*HeadHeaderHash, err
 func (db *Store)setHeadBlockHash(hash string) error {
 	return db.execute(func(mongoDb *mongo.Database, ctx *context.Context) error {
 		collection := mongoDb.Collection(headBlockTable)
-		if _, err := db.getHeadBlockHash(mongoDb); err != nil {
+		if _, err := db.getHeadBlockHash(mongoDb, ctx); err != nil {
 			// do insert
 			head := HeadBlockHash{
 				ID: 1,
@@ -286,9 +286,9 @@ func (db *Store)setHeadBlockHash(hash string) error {
 	})
 }
 
-func (db *Store)getHeadBlockHash(mongoDb *mongo.Database) (*HeadBlockHash, error) {
+func (db *Store)getHeadBlockHash(mongoDb *mongo.Database, ctx *context.Context) (*HeadBlockHash, error) {
 	cur := mongoDb.Collection(headBlockTable).FindOne(
-		context.Background(),
+		*ctx,
 		bson.M{"ID": bsonx.Int32(1)},
 	)
 	var r HeadBlockHash
@@ -302,7 +302,7 @@ func (db *Store)getHeadBlockHash(mongoDb *mongo.Database) (*HeadBlockHash, error
 func (db *Store)setHeadHeaderHash(hash string) error {
 	return db.execute(func(mongoDb *mongo.Database, ctx *context.Context) error {
 		collection := mongoDb.Collection(headHeaderTable)
-		if _, err := db.getHeadHeaderHash(mongoDb); err != nil {
+		if _, err := db.getHeadHeaderHash(mongoDb, ctx); err != nil {
 			// do insert
 			head := HeadHeaderHash{
 				ID: 1,
@@ -332,7 +332,7 @@ func (db *Store)WriteReceipts(hash common.Hash, height uint64, receipts types.Re
 	// add this process into goroutine in order to prevent slow sync processes
 	go func() {
 		if err := db.execute(func(mongoDb *mongo.Database, ctx *context.Context) error {
-			return db.insertReceipts(mongoDb, hash.Hex(), height, receipts)
+			return db.insertReceipts(mongoDb, ctx, hash.Hex(), height, receipts)
 		}); err != nil {
 			log.Error("error while writing receipts", "err", err, "height", height)
 		}
@@ -599,7 +599,7 @@ func (db *Store)ReadHeaderRLP(hash common.Hash, height uint64) rlp.RawValue {
 func (db *Store)ReadHeadBlockHash() common.Hash {
 	hash := common.NewZeroHash()
 	if err := db.execute(func(mongoDb *mongo.Database, ctx *context.Context) error {
-		head, e := db.getHeadBlockHash(mongoDb)
+		head, e := db.getHeadBlockHash(mongoDb, ctx)
 		if head != nil {
 			hash = common.HexToHash(head.Hash)
 		}
@@ -614,7 +614,7 @@ func (db *Store)ReadHeadBlockHash() common.Hash {
 func (db *Store)ReadHeadHeaderHash() common.Hash {
 	hash := common.NewZeroHash()
 	if err := db.execute(func(mongoDb *mongo.Database, ctx *context.Context) error {
-		head, e := db.getHeadHeaderHash(mongoDb)
+		head, e := db.getHeadHeaderHash(mongoDb, ctx)
 		if head != nil {
 			hash = common.HexToHash(head.Hash)
 		}
@@ -705,7 +705,7 @@ func (db *Store)ReadHeaderNumber(hash common.Hash) *uint64 {
 func (db *Store)ReadReceipts(hash common.Hash, number uint64) types.Receipts {
 	newReceipts := make(types.Receipts, 0)
 	if err := db.execute(func(mongoDb *mongo.Database, ctx *context.Context) error {
-		if receipts, e := db.getReceiptsByBlockHash(mongoDb, hash); e != nil {
+		if receipts, e := db.getReceiptsByBlockHash(mongoDb, ctx, hash); e != nil {
 			return e
 		} else {
 			for _, receipt := range receipts {
@@ -727,7 +727,7 @@ func (db *Store) getEvents(address string) ([]*WatcherAction, error) {
 		if e != nil {
 			return e
 		}
-		for cur.Next(context.Background()) {
+		for cur.Next(*ctx) {
 			var r WatcherAction
 			if err := cur.Decode(&r); err != nil {
 				return err
@@ -749,7 +749,7 @@ func (db *Store)getEvent(address, method string) (*WatcherAction, error) {
 			bson.D{{"method", bsonx.String(method)}},
 		}
 		cur := mongoDb.Collection(watcherActionTable).FindOne(
-			context.Background(),
+			*ctx,
 			filter,
 		)
 		err := cur.Decode(&event)
@@ -767,7 +767,7 @@ func (db *Store)getEventByDualAction(action string) (*DualAction, error) {
 	var event DualAction
 	if err := db.execute(func(mongoDb *mongo.Database, ctx *context.Context) error {
 		cur := mongoDb.Collection(dualActionTable).FindOne(
-			context.Background(),
+			*ctx,
 			bson.M{"name": bsonx.String(action)},
 		)
 		err := cur.Decode(&event)
@@ -971,7 +971,7 @@ func (db *Store)insertBlock(mongoDb *mongo.Database, ctx *context.Context, block
 
 func (db *Store)getTransactionsByBlockId(mongoDb *mongo.Database, ctx *context.Context, height uint64) ([]*Transaction, error) {
 	txs := make([]*Transaction, 0)
-	if cur, err := mongoDb.Collection(txTable).Find(context.Background(), bson.M{"height": bsonx.Int64(int64(height))}); err != nil {
+	if cur, err := mongoDb.Collection(txTable).Find(*ctx, bson.M{"height": bsonx.Int64(int64(height))}); err != nil {
 		return nil, err
 	} else {
 		for cur.Next(*ctx) {
