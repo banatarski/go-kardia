@@ -45,13 +45,13 @@ type Account struct {
 }
 
 const (
-	defaultGasLimit      = 10 // currently we don't care about tx fee and cost.
+	defaultGasLimit      = configs.TxGas // currently we don't care about tx fee and cost.
 	defaultFaucetPrivAcc = "4561f7d91a4f95ef0a72550fa423febaad3594f91611f9a2b10a7af4d3deb9ed"
 )
 
 var (
 	defaultAmount   = big.NewInt(10)
-	defaultGasPrice = big.NewInt(10)
+	defaultGasPrice = big.NewInt(1)
 )
 
 type GeneratorTool struct {
