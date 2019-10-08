@@ -264,18 +264,18 @@ func (st *StateTransition) buyGas() error {
 
 func (st *StateTransition) preCheck() error {
 	// Make sure this transaction's nonce is correct.
-	// if st.msg.CheckNonce() {
-	// 	nonce := st.state.GetNonce(st.msg.From())
-	// 	// FIXME(kiendn): nonce does not need to check too high, it can be depended on what user input
-	// 	// as long as nonce is not less than or equals current state then it wil be fined.
+	if st.msg.CheckNonce() {
+		nonce := st.state.GetNonce(st.msg.From())
+		// FIXME(kiendn): nonce does not need to check too high, it can be depended on what user input
+		// as long as nonce is not less than or equals current state then it wil be fined.
 
-	// 	//if nonce < st.msg.Nonce() {
-	// 	//	return ErrNonceTooHigh
-	// 	//} else
-	// 	if nonce > st.msg.Nonce() {
-	// 		//return tx_pool.ErrNonceTooLow
-	// 		return fmt.Errorf("nonce too low - current nonce is %v sender %v sender's nonce %v", nonce, st.msg.From().Hex(), st.msg.Nonce())
-	// 	}
+		//if nonce < st.msg.Nonce() {
+		//	return ErrNonceTooHigh
+		//} else
+		if nonce > st.msg.Nonce() {
+			//return tx_pool.ErrNonceTooLow
+			return fmt.Errorf("nonce too low - current nonce is %v sender %v sender's nonce %v", nonce, st.msg.From().Hex(), st.msg.Nonce())
+		}
 	// }
 	return st.buyGas()
 }
