@@ -346,7 +346,7 @@ func (kvm *KVM) create(caller ContractRef, codeAndHash *codeAndHash, gas uint64,
 	}
 
 	nonce := kvm.StateDB.GetNonce(caller.Address())
-	kvm.StateDB.SetNonce(caller.Address(), nonce+1)
+	kvm.StateDB.SetNonce(caller.Address(), nonce + 1)
 
 	// Ensure there's no existing contract already at the designated address
 	contractHash := kvm.StateDB.GetCodeHash(address)

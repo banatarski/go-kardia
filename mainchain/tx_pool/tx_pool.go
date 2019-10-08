@@ -382,9 +382,9 @@ func (pool *TxPool) ValidateTx(tx *types.Transaction) (*common.Address, error) {
 		return nil, fmt.Errorf("%v has reached its limit %v/%v", sender.Hex(), len(pool.pending[*sender]), pool.config.GlobalSlots)
 	}
 
-	if tx.Nonce() <= pool.addressState[*sender] && pool.addressState[*sender] > 0 {
-		return nil, fmt.Errorf("invalid nonce with sender %v %v <= %v", sender.Hex(), tx.Nonce(), pool.addressState[*sender])
-	}
+	// if tx.Nonce() <= pool.addressState[*sender] && pool.addressState[*sender] > 0 {
+	// 	return nil, fmt.Errorf("invalid nonce with sender %v %v <= %v", sender.Hex(), tx.Nonce(), pool.addressState[*sender])
+	// }
 
 	// if tx has been added into db then reject it
 	if pool.all.Has(tx.Hash()) {
