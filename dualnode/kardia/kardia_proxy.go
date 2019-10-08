@@ -21,6 +21,9 @@ package kardia
 import (
 	"crypto/ecdsa"
 	"fmt"
+	"math/big"
+	"strings"
+
 	"github.com/kardiachain/go-kardia/configs"
 	"github.com/kardiachain/go-kardia/dualchain/event_pool"
 	"github.com/kardiachain/go-kardia/dualnode"
@@ -33,8 +36,6 @@ import (
 	"github.com/kardiachain/go-kardia/lib/log"
 	"github.com/kardiachain/go-kardia/mainchain/tx_pool"
 	"github.com/kardiachain/go-kardia/types"
-	"math/big"
-	"strings"
 )
 
 const KARDIA_PROXY = "KARDIA_PROXY"
@@ -423,7 +424,8 @@ func (p *KardiaProxy) extractKardiaTxSummary(tx *types.Transaction, abi *abi.ABI
 	case configs.AddOrderFunction:
 		exchangeExternalData = make([][]byte, configs.ExchangeV2NumOfExchangeDataField)
 		var decodedInput types.MatchOrderInput
-		err = abi.UnpackInput(&decodedInput, configs.AddOrderFunction, input[4:])
+		decodedInputMap := common.Map(decodedInput)
+		err = p.smcABI.UnpackIntoMap(decodedInputMap, configs.AddOrderFunction, input[4:])
 		if err != nil {
 			log.Error("failed to get external data of exchange contract event", "method", method.Name)
 			return types.EventSummary{}, configs.ErrFailedGetEventData

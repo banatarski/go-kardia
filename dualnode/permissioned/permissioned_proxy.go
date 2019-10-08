@@ -20,6 +20,10 @@ package permissioned
 
 import (
 	"fmt"
+	"math/big"
+	"strconv"
+	"strings"
+
 	"github.com/kardiachain/go-kardia/configs"
 	"github.com/kardiachain/go-kardia/dualchain/event_pool"
 	"github.com/kardiachain/go-kardia/dualnode/utils"
@@ -29,15 +33,12 @@ import (
 	"github.com/kardiachain/go-kardia/lib/common"
 	"github.com/kardiachain/go-kardia/lib/event"
 	"github.com/kardiachain/go-kardia/lib/log"
-	"github.com/kardiachain/go-kardia/mainchain"
+	kai "github.com/kardiachain/go-kardia/mainchain"
 	"github.com/kardiachain/go-kardia/mainchain/permissioned"
 	"github.com/kardiachain/go-kardia/mainchain/tx_pool"
 	"github.com/kardiachain/go-kardia/node"
 	"github.com/kardiachain/go-kardia/types"
 	"github.com/pkg/errors"
-	"math/big"
-	"strconv"
-	"strings"
 )
 
 const SERVICE_NAME = "PRIVATE_DUAL"
@@ -291,7 +292,8 @@ func (p *PermissionedProxy) extractPrivateChainTxSummary(input []byte, method st
 	case configs.PrivateChainRequestInfoFunction:
 		extraData := make([][]byte, configs.PrivateChainCandidateRequestFields)
 		var candidateInfoRequestInput ExternalCandidateInfoRequestInput
-		unpackErr := p.smcABI.UnpackInput(&candidateInfoRequestInput,
+		candidateInfoRequestInputMap := common.Map(candidateInfoRequestInput)
+		unpackErr := p.smcABI.UnpackIntoMap(candidateInfoRequestInputMap,
 			configs.PrivateChainRequestInfoFunction, input[4:])
 		if unpackErr != nil {
 			p.logger.Error("Error unpacking event", "err", unpackErr)
@@ -308,7 +310,8 @@ func (p *PermissionedProxy) extractPrivateChainTxSummary(input []byte, method st
 	case configs.PrivateChainCompleteRequestFunction:
 		extraData := make([][]byte, configs.PrivateChainCandidateRequestCompletedFields)
 		var completeRequestInput CompleteRequestInput
-		unpackErr := p.smcABI.UnpackInput(&completeRequestInput,
+		completeRequestInputMap := common.Map(completeRequestInput)
+		unpackErr := p.smcABI.UnpackIntoMap(completeRequestInputMap,
 			configs.PrivateChainCompleteRequestFunction, input[4:])
 		if unpackErr != nil {
 			p.logger.Error("Error unpacking event", "data", input, "err", unpackErr)

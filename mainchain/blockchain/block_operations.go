@@ -256,6 +256,8 @@ LOOP:
 		receipts = append(receipts, receipt)
 		newTxs = append(newTxs, tx)
 	}
+
+	header.NumTxs = uint64(newTxs.Len())
 	root, err := state.Commit(true)
 
 	if err != nil {
