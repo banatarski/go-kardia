@@ -264,19 +264,19 @@ func (st *StateTransition) buyGas() error {
 
 func (st *StateTransition) preCheck() error {
 	// Make sure this transaction's nonce is correct.
-	if st.msg.CheckNonce() {
-		nonce := st.state.GetNonce(st.msg.From())
-		// FIXME(kiendn): nonce does not need to check too high, it can be depended on what user input
-		// as long as nonce is not less than or equals current state then it wil be fined.
+	// if st.msg.CheckNonce() {
+	// 	nonce := st.state.GetNonce(st.msg.From())
+	// 	// FIXME(kiendn): nonce does not need to check too high, it can be depended on what user input
+	// 	// as long as nonce is not less than or equals current state then it wil be fined.
 
-		//if nonce < st.msg.Nonce() {
-		//	return ErrNonceTooHigh
-		//} else
-		if nonce > st.msg.Nonce() {
-			//return tx_pool.ErrNonceTooLow
-			return fmt.Errorf("nonce too low - current nonce is %v sender %v sender's nonce %v", nonce, st.msg.From().Hex(), st.msg.Nonce())
-		}
-	}
+	// 	//if nonce < st.msg.Nonce() {
+	// 	//	return ErrNonceTooHigh
+	// 	//} else
+	// 	if nonce > st.msg.Nonce() {
+	// 		//return tx_pool.ErrNonceTooLow
+	// 		return fmt.Errorf("nonce too low - current nonce is %v sender %v sender's nonce %v", nonce, st.msg.From().Hex(), st.msg.Nonce())
+	// 	}
+	// }
 	return st.buyGas()
 }
 
@@ -311,10 +311,10 @@ func (st *StateTransition) TransitionDb() (ret []byte, usedGas uint64, failed bo
 		ret, _, st.gas, vmerr = vm.Create(sender, st.data, st.gas, st.value)
 	} else {
 		// Increment the nonce for the next transaction
-		//st.state.SetNonce(msg.From(), st.state.GetNonce(sender.Address())+1)
+		st.state.SetNonce(msg.From(), st.state.GetNonce(sender.Address())+1)
 
 		// FIXME(kiendn): set current state to msg nonce input from transaction instead auto increment +1
-		st.state.SetNonce(msg.From(), msg.Nonce())
+		// st.state.SetNonce(msg.From(), msg.Nonce())
 		ret, st.gas, vmerr = vm.Call(sender, st.to(), st.data, st.gas, st.value)
 	}
 	if vmerr != nil {
