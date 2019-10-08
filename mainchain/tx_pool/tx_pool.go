@@ -58,11 +58,11 @@ type blockChain interface {
 
 // TxPoolConfig are the configuration parameters of the transaction pool.
 type TxPoolConfig struct {
-	NoLocals  bool          // Whether local transaction handling should be disabled
-	Journal   string        // Journal of local transactions to survive node restarts
-	Rejournal time.Duration // Time interval to regenerate the local transaction journal
-	GlobalSlots  uint64 // Maximum number of executable transaction slots for all accounts
-	GlobalQueue  uint64 // Maximum number of non-executable transaction slots for all accounts
+	NoLocals        bool          // Whether local transaction handling should be disabled
+	Journal         string        // Journal of local transactions to survive node restarts
+	Rejournal       time.Duration // Time interval to regenerate the local transaction journal
+	GlobalSlots     uint64        // Maximum number of executable transaction slots for all accounts
+	GlobalQueue     uint64        // Maximum number of non-executable transaction slots for all accounts
 	NumberOfWorkers int
 	WorkerCap       int
 	BlockSize       int
@@ -74,12 +74,12 @@ var DefaultTxPoolConfig = TxPoolConfig{
 	Journal:   "transactions.rlp",
 	Rejournal: time.Hour,
 
-	GlobalSlots:  64,
-	GlobalQueue:  5120000,
+	GlobalSlots: 64,
+	GlobalQueue: 5120000,
 
 	NumberOfWorkers: 3,
-	WorkerCap: 512,
-	BlockSize: 7192,
+	WorkerCap:       512,
+	BlockSize:       7192,
 }
 
 // GetDefaultTxPoolConfig returns default txPoolConfig with given dir path
@@ -98,17 +98,17 @@ func GetDefaultTxPoolConfig(path string) *TxPoolConfig {
 type TxPool struct {
 	logger log.Logger
 
-	config       TxPoolConfig
-	chainconfig  *types.ChainConfig
-	chain        blockChain
-	txFeed       event.Feed
-	scope        event.SubscriptionScope
+	config      TxPoolConfig
+	chainconfig *types.ChainConfig
+	chain       blockChain
+	txFeed      event.Feed
+	scope       event.SubscriptionScope
 
 	// txsCh is used for pending txs
-	txsCh       chan []interface{}
+	txsCh chan []interface{}
 
 	// allCh is used to cache all processed txs
-	allCh       chan []interface{}
+	allCh chan []interface{}
 
 	chainHeadCh  chan events.ChainHeadEvent
 	chainHeadSub event.Subscription
@@ -117,19 +117,19 @@ type TxPool struct {
 	numberOfWorkers int
 	workerCap       int
 
-	currentState *state.StateDB      // Current state in the blockchain head
-	pendingState *state.ManagedState // Pending state tracking virtual nonces
+	currentState *state.StateDB            // Current state in the blockchain head
+	pendingState *state.ManagedState       // Pending state tracking virtual nonces
 	addressState map[common.Address]uint64 // address state will cache current state of addresses with the latest nonce
 
-	currentMaxGas uint64 // Current gas limit for transaction caps
+	currentMaxGas   uint64 // Current gas limit for transaction caps
 	totalPendingGas uint64
 
-	journal *txJournal  // Journal of local transaction to back up to disk
+	journal *txJournal // Journal of local transaction to back up to disk
 
-	pendingSize uint // pendingSize is a counter, increased when adding new txs, decreased when remove txs
-	pending  map[common.Address]types.Transactions   // All currently processable transactions
-	all      *common.Set                        // All transactions to allow lookups
-	promotableQueue *common.Set                 // a queue of addresses that are waiting for processing txs (FIFO)
+	pendingSize     uint                                  // pendingSize is a counter, increased when adding new txs, decreased when remove txs
+	pending         map[common.Address]types.Transactions // All currently processable transactions
+	all             *common.Set                           // All transactions to allow lookups
+	promotableQueue *common.Set                           // a queue of addresses that are waiting for processing txs (FIFO)
 
 	wg sync.WaitGroup // for shutdown sync
 }
@@ -142,21 +142,21 @@ func NewTxPool(logger log.Logger, config TxPoolConfig, chainconfig *types.ChainC
 
 	// Create the transaction pool with its initial settings
 	pool := &TxPool{
-		logger:      logger,
-		config:      config,
-		chainconfig: chainconfig,
-		chain:       chain,
-		pending:     make(map[common.Address]types.Transactions),
-		all:         common.NewSet(int64(config.GlobalQueue)),
+		logger:          logger,
+		config:          config,
+		chainconfig:     chainconfig,
+		chain:           chain,
+		pending:         make(map[common.Address]types.Transactions),
+		all:             common.NewSet(int64(config.GlobalQueue)),
 		promotableQueue: common.NewSet(promotableQueueSize),
-		addressState: make(map[common.Address]uint64),
-		chainHeadCh: make(chan events.ChainHeadEvent, chainHeadChanSize),
+		addressState:    make(map[common.Address]uint64),
+		chainHeadCh:     make(chan events.ChainHeadEvent, chainHeadChanSize),
 		totalPendingGas: uint64(0),
-		txsCh: make(chan []interface{}, 100),
-		allCh: make(chan []interface{}),
+		txsCh:           make(chan []interface{}, 100),
+		allCh:           make(chan []interface{}),
 		numberOfWorkers: config.NumberOfWorkers,
-		workerCap: config.WorkerCap,
-		pendingSize: 0,
+		workerCap:       config.WorkerCap,
+		pendingSize:     0,
 	}
 	//pool.priced = newTxPricedList(logger, pool.all)
 	pool.reset(nil, chain.CurrentBlock().Header())
@@ -248,14 +248,14 @@ func (pool *TxPool) lockedReset(oldHead, newHead *types.Header) {
 // of the transaction pool is valid with regard to the chain state.
 func (pool *TxPool) reset(oldHead, newHead *types.Header) {
 	// Initialize the internal state to the current head
-	currentBlock := pool.chain.CurrentBlock()
+	// currentBlock := pool.chain.CurrentBlock()
 
 	if newHead == nil {
-		newHead = currentBlock.Header() // Special case during testing
+		newHead = pool.chain.CurrentBlock().Header() // Special case during testing
 	}
 
-	statedb, err := pool.chain.StateAt(currentBlock.Root())
-	pool.logger.Info("TxPool reset state to new head block", "height", newHead.Height, "root", newHead.Root)
+	statedb, err := pool.chain.StateAt(newHead.Root)
+	// pool.logger.Info("TxPool reset state to new head block", "height", newHead.Height, "root", newHead.Root)
 	if err != nil {
 		pool.logger.Error("Failed to reset txpool state", "err", err)
 		return
@@ -265,8 +265,8 @@ func (pool *TxPool) reset(oldHead, newHead *types.Header) {
 	pool.currentMaxGas = newHead.GasLimit
 
 	// remove current block's txs from pending
-	pool.RemoveTxs(currentBlock.Transactions())
-	go pool.saveTxs(currentBlock.Transactions())
+	// pool.RemoveTxs(currentBlock.Transactions())
+	// go pool.saveTxs(currentBlock.Transactions())
 }
 
 // Stop terminates the transaction pool.
@@ -393,7 +393,6 @@ func (pool *TxPool) ValidateTx(tx *types.Transaction) (*common.Address, error) {
 
 	return sender, nil
 }
-
 
 // AddTx enqueues a single transaction into the pool if it is valid
 func (pool *TxPool) AddTx(tx *types.Transaction) error {
@@ -543,8 +542,9 @@ func (pool *TxPool) GetPendingData() *types.Transactions {
 // by their nonces. This is usually only useful for sorting transactions from a
 // single account, otherwise a nonce comparison doesn't make much sense.
 type TxInterfaceByNonce []interface{}
-func (s TxInterfaceByNonce) Len() int           { return len(s) }
+
+func (s TxInterfaceByNonce) Len() int { return len(s) }
 func (s TxInterfaceByNonce) Less(i, j int) bool {
 	return s[i].(*types.Transaction).Nonce() < s[j].(*types.Transaction).Nonce()
 }
-func (s TxInterfaceByNonce) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
+func (s TxInterfaceByNonce) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
