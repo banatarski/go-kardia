@@ -276,7 +276,7 @@ func (st *StateTransition) preCheck() error {
 			//return tx_pool.ErrNonceTooLow
 			return fmt.Errorf("nonce too low - current nonce is %v sender %v sender's nonce %v", nonce, st.msg.From().Hex(), st.msg.Nonce())
 		}
-	// }
+	}
 	return st.buyGas()
 }
 
