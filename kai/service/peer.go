@@ -44,12 +44,12 @@ var (
 
 const (
 	handshakeTimeout = 5 * time.Second
-	maxKnownTxs      = 1000000 // Maximum transactions hashes to keep in the known list (prevent DOS)
+	maxKnownTxs      = 5120 // Maximum transactions hashes to keep in the known list (prevent DOS)
 
 	// maxQueuedTxs is the maximum number of transaction lists to queue up before
 	// dropping broadcasts. This is a sensitive number as a transaction list might
 	// contain a single transaction, or thousands.
-	maxQueuedTxs = 10000
+	maxQueuedTxs = 5120
 )
 
 // PeerInfo represents a short summary of the Kai sub-protocol metadata known
@@ -329,6 +329,11 @@ func (p *peer) MarkTransactions(txs types.Transactions, filter bool) []interface
 		txHashes = append(txHashes, tx.Hash())
 	}
 
+	// If we reached the memory allowance, drop a previously known transaction hash
+	for p.knownTxs.Size() >= maxKnownTxs {
+		p.knownTxs.Pop()
+	}
+
 	if len(newTxs) > 0 {
 		p.knownTxs.Add(txHashes...)
 	}
@@ -384,6 +389,10 @@ func (ps *peerSet) PeersWithoutTxs(txs types.Transactions) map[*peer]types.Trans
 
 // SendTransactions sends transactions to the peer, adds the txn hashes to known txn set.
 func (p *peer) SendTransactions(txs types.Transactions) error {
+	// If we reached the memory allowance, drop a previously known transaction hash
+	for p.knownTxs.Size() >= maxKnownTxs {
+		p.knownTxs.Pop()
+	}
 	return p2p.Send(p.rw, serviceconst.TxMsg, txs)
 }
 

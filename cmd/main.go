@@ -123,6 +123,8 @@ func (c *Config)getTxPoolConfig() tx_pool.TxPoolConfig {
 		NumberOfWorkers: txPool.NumberOfWorkers,
 		WorkerCap: txPool.WorkerCap,
 		BlockSize: txPool.BlockSize,
+
+		LifeTime: 5 * time.Minute,
 	}
 }
 
