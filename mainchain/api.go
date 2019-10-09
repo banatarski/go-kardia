@@ -457,7 +457,7 @@ func (a *PublicAccountAPI) Balance(address string, hash string, height int64) st
 }
 
 // Nonce return address's nonce
-func (a *PublicAccountAPI) Nonce(address string) (uint64, error) {
+/*func (a *PublicAccountAPI) Nonce(address string) (uint64, error) {
 	addr := common.HexToAddress(address)
 	block := a.kaiService.blockchain.CurrentBlock()
 	state, err := a.kaiService.blockchain.StateAt(block.Root())
@@ -466,6 +466,12 @@ func (a *PublicAccountAPI) Nonce(address string) (uint64, error) {
 		return 0, err
 	}
 	return state.GetNonce(addr), nil
+}*/
+
+func (a *PublicAccountAPI) Nonce(address string) (uint64, error) {
+	addr := common.HexToAddress(address)
+	nonce := a.kaiService.txPool.GetAddressState(addr)
+	return nonce, nil
 }
 
 // doCall is an interface to make smart contract call against the state of local node
