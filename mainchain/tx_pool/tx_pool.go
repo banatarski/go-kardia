@@ -485,11 +485,7 @@ func (pool *TxPool) addTx(tx *types.Transaction) error {
 	pool.pending[*sender] = pendingTxs
 
 	// update address state
-	if nonce, ok := pool.addressState[*sender]; !ok || nonce < tx.Nonce() {
-		//pool.logger.Info("update nonce", "address", sender.Hex(), "nonce", tx.Nonce(), "currentNonce", nonce)
-		pool.addressState[*sender] = tx.Nonce()
-	}
-
+	pool.addressState[*sender] = pendingTxs[len(pendingTxs) -1].Nonce()
 	pool.pendingSize += 1
 
 	return nil
@@ -668,11 +664,12 @@ func (pool *TxPool) GetBlockChain() blockChain {
 func (pool *TxPool) GetAddressState(address common.Address) uint64 {
 	pool.mu.Lock()
 	defer pool.mu.Unlock()
-	nonce := pool.currentState.GetNonce(address) + 1
+
+	nonce := pool.currentState.GetNonce(address)
 	if _, ok := pool.addressState[address]; !ok {
 		return nonce
 	} else if nonce > pool.addressState[address] {
-		pool.addressState[address] = nonce
+		return nonce
 	}
 	return pool.addressState[address] + 1
 }
