@@ -50,6 +50,7 @@ const (
 	DefaultFaucetPrivAcc        = "4561f7d91a4f95ef0a72550fa423febaad3594f91611f9a2b10a7af4d3deb9ed"
 	DefaultGenRandomWithStateTx = 1
 	DefaultGenRandomTx          = 2
+	DefaultGenWithStateTx = 3
 )
 
 var (
@@ -218,6 +219,54 @@ func (genTool *GeneratorTool) GenerateRandomTxWithAddressState(numTx int, txPool
 	return result
 }
 
+func (genTool *GeneratorTool) GenerateTxWithAddressState(numTx int, txPool *tx_pool.TxPool) types.Transactions {
+	if numTx <= 0 || len(genTool.accounts) == 0 {
+		return nil
+	}
+	result := make(types.Transactions, numTx)
+	genTool.mu.Lock()
+	index := 0
+	for i := 0; i < numTx; i++ {
+		if i > len(genTool.accounts) {
+			index = 0
+		}
+
+		senderKey, toAddr := txAddress(genTool.accounts[index])
+		if senderKey == nil {
+			continue
+		}
+
+		senderPublicKey := crypto.PubkeyToAddress(senderKey.PublicKey)
+		nonce := txPool.GetAddressState(senderPublicKey)
+		amount := big.NewInt(int64(RandomInt(10, 20)))
+		amount = amount.Mul(amount, big.NewInt(int64(math.Pow10(18))))
+		senderAddrS := senderPublicKey.String()
+		//get nonce from sender mapping
+		nonceMap := genTool.GetNonce(senderAddrS)
+		if nonce < nonceMap { // check nonce from statedb and nonceMap
+			nonce = nonceMap
+		}
+
+		tx, err := types.SignTx(types.NewTransaction(
+			nonce,
+			toAddr,
+			amount,
+			DefaultGasLimit,
+			defaultGasPrice,
+			nil,
+		), senderKey)
+		if err != nil {
+			panic(fmt.Sprintf("Fail to sign generated tx: %v", err))
+		}
+		result[i] = tx
+		nonce += 1
+		genTool.nonceMap[senderAddrS] = nonce
+		index += 1
+	}
+	genTool.mu.Unlock()
+	return result
+}
+
 func (genTool *GeneratorTool) GetNonce(address string) uint64 {
 	return genTool.nonceMap[address]
 }
@@ -259,6 +308,26 @@ func randomTxAddresses(accounts []Account) (senderKey *ecdsa.PrivateKey, toAddr 
 	return senderKey, toAddr
 }
 
+func txAddress (account Account) (senderKey *ecdsa.PrivateKey, toAddr common.Address) {
+	pkByte, _ := hex.DecodeString(account.PrivateKey)
+	privateKey := crypto.ToECDSAUnsafe(pkByte)
+	privateKeyBytes := crypto.FromECDSA(privateKey)
+	privateKeyHex := hexutil.Encode(privateKeyBytes)[2:]
+	// ignore genesis account
+	if _, ok := configs.GenesisAddrKeys[privateKeyHex]; ok {
+		return nil, common.Address{}
+	}
+
+	for {
+		toAddr = randomGenesisAddress()
+		if crypto.PubkeyToAddress(privateKey.PublicKey) != toAddr {
+			break
+		}
+	}
+
+	return senderKey, toAddr
+}
+
 func randomGenesisAddress() common.Address {
 	size := len(configs.GenesisAddrKeys)
 	randomI := rand.Intn(size)
@@ -270,13 +339,6 @@ func randomGenesisAddress() common.Address {
 		index++
 	}
 	panic("impossible failure")
-}
-
-func randomAddress() common.Address {
-	rand.Seed(time.Now().UTC().UnixNano())
-	address := make([]byte, 20)
-	rand.Read(address)
-	return common.BytesToAddress(address)
 }
 
 func randomGenesisPrivateKey(accounts []Account) *ecdsa.PrivateKey {

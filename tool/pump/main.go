@@ -139,6 +139,17 @@ func (c *Config) getDbInfo(isDual bool) storage.DbInfo {
 	}
 }
 
+
+func mergeMaps(maps ...map[string]string) map[string]string {
+	result := make(map[string]string)
+	for _, m := range maps {
+		for k, v := range m {
+			result[k] = v
+		}
+	}
+	return result
+}
+
 // getTxPoolConfig gets txPoolConfig from config
 func (c *Config) getTxPoolConfig() tx_pool.TxPoolConfig {
 	txPool := c.MainChain.TxPool
@@ -170,6 +181,15 @@ func (c *Config) getGenesis(isDual bool) (*genesis.Genesis, error) {
 
 		amount, _ := big.NewInt(0).SetString(g.GenesisAmount, 10)
 		for _, address := range g.Addresses {
+			genesisAccounts[address] = amount
+		}
+
+		// add for account stresstest
+		accounts := mergeMaps(
+			GenesisAddrKeys1, GenesisAddrKeys2, GenesisAddrKeys3, GenesisAddrKeys4,
+			GenesisAddrKeys5, GenesisAddrKeys6, GenesisAddrKeys7, GenesisAddrKeys8,
+			GenesisAddrKeys9,  GenesisAddrKeys10, GenesisAddrKeys11, GenesisAddrKeys12)
+		for address,_  := range accounts {
 			genesisAccounts[address] = amount
 		}
 
@@ -581,6 +601,8 @@ func generateTxs(genTxs *GenTxs, genTool *tool.GeneratorTool, txPool *tx_pool.Tx
 		txList = genTool.GenerateRandomTxWithAddressState(genTxs.NumTxs, txPool)
 	case tool.DefaultGenRandomTx:
 		txList = genTool.GenerateRandomTx(genTxs.NumTxs)
+	case tool.DefaultGenWithStateTx:
+		txList = genTool.GenerateTxWithAddressState(genTxs.NumTxs, txPool)
 	}
 	txPool.AddTxs(txList)
 	log.Info("GenTxs Adding new transactions", "num", genTxs.NumTxs, "genType", genTxs.Type)
