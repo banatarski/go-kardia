@@ -53,7 +53,7 @@ func TestClientSyncTree(t *testing.T) {
 		wantSeq   = uint(1)
 	)
 
-	c, _ := NewClient(Config{Resolver: r, Logger: log.Logger(t, log.LvlTrace)})
+	c, _ := NewClient(Config{Resolver: r, Logger: log.New()})
 	stree, err := c.SyncTree("enrtree://AKPYQIUQIL7PSIACI32J7FGZW56E5FKHEFCCOFHILBIMW3M6LWXS2@n")
 	if err != nil {
 		t.Fatal("sync error:", err)
@@ -90,7 +90,7 @@ func TestClientSyncTreeBadNode(t *testing.T) {
 		"C7HRFPF3BLGF3YR4DY5KX3SMBE.n": "enrtree://AM5FCQLWIZX2QFPNJAP7VUERCCRNGRHWZG3YYHIUV7BVDQ5FDPRT2@morenodes.example.org",
 		"INDMVBZEEQ4ESVYAKGIYU74EAA.n": "enr:-----",
 	}
-	c, _ := NewClient(Config{Resolver: r, Logger: log.Logger(t, log.LvlTrace)})
+	c, _ := NewClient(Config{Resolver: r, Logger: log.New()})
 	_, err := c.SyncTree("enrtree://AKPYQIUQIL7PSIACI32J7FGZW56E5FKHEFCCOFHILBIMW3M6LWXS2@n")
 	wantErr := nameError{name: "INDMVBZEEQ4ESVYAKGIYU74EAA.n", err: entryError{typ: "enr", err: errInvalidENR}}
 	if err != wantErr {
@@ -103,7 +103,7 @@ func TestClientRandomNode(t *testing.T) {
 	nodes := testNodes(nodesSeed1, 30)
 	tree, url := makeTestTree("n", nodes, nil)
 	r := mapResolver(tree.ToTXT("n"))
-	c, _ := NewClient(Config{Resolver: r, Logger: log.Logger(t, log.LvlTrace)})
+	c, _ := NewClient(Config{Resolver: r, Logger: log.New()})
 	if err := c.AddTree(url); err != nil {
 		t.Fatal(err)
 	}
@@ -118,7 +118,7 @@ func TestClientRandomNodeLinks(t *testing.T) {
 	tree2, url2 := makeTestTree("t2", nodes[10:], []string{url1})
 	cfg := Config{
 		Resolver: newMapResolver(tree1.ToTXT("t1"), tree2.ToTXT("t2")),
-		Logger:   log.Logger(t, log.LvlTrace),
+		Logger:   log.New(),
 	}
 	c, _ := NewClient(cfg)
 	if err := c.AddTree(url2); err != nil {
@@ -137,7 +137,7 @@ func TestClientRandomNodeUpdates(t *testing.T) {
 		resolver = newMapResolver()
 		cfg      = Config{
 			Resolver:        resolver,
-			Logger:          log.Logger(t, log.LvlTrace),
+			Logger:          log.New(),
 			RecheckInterval: 20 * time.Minute,
 		}
 		c, _ = NewClient(cfg)
@@ -176,7 +176,7 @@ func TestClientRandomNodeLinkUpdates(t *testing.T) {
 		resolver = newMapResolver()
 		cfg      = Config{
 			Resolver:        resolver,
-			Logger:          log.Logger(t, log.LvlTrace),
+			Logger:          log.New(),
 			RecheckInterval: 20 * time.Minute,
 		}
 		c, _ = NewClient(cfg)

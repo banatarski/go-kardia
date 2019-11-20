@@ -82,7 +82,7 @@ func runDialTest(t *testing.T, test dialtest) {
 
 // This test checks that dynamic dials are launched from discovery results.
 func TestDialStateDynDial(t *testing.T) {
-	config := &Config{Logger: log.Logger(t, log.LvlTrace)}
+	config := &Config{Logger: log.New()}
 	runDialTest(t, dialtest{
 		init: newDialState(enode.ID{}, 5, config),
 		rounds: []round{
@@ -226,7 +226,7 @@ func TestDialStateDynDialBootnode(t *testing.T) {
 			newNode(uintID(2), nil),
 			newNode(uintID(3), nil),
 		},
-		Logger: log.Logger(t, log.LvlTrace),
+		Logger: log.New(),
 	}
 	runDialTest(t, dialtest{
 		init: newDialState(enode.ID{}, 5, config),
@@ -363,7 +363,7 @@ func TestDialStateStaticDial(t *testing.T) {
 			newNode(uintID(4), nil),
 			newNode(uintID(5), nil),
 		},
-		Logger: log.Logger(t, log.LvlTrace),
+		Logger: log.New(),
 	}
 	runDialTest(t, dialtest{
 		init: newDialState(enode.ID{}, 0, config),
@@ -448,7 +448,7 @@ func TestDialStateCache(t *testing.T) {
 			newNode(uintID(2), nil),
 			newNode(uintID(3), nil),
 		},
-		Logger: log.Logger(t, log.LvlTrace),
+		Logger: log.New(),
 	}
 	runDialTest(t, dialtest{
 		init: newDialState(enode.ID{}, 0, config),
@@ -521,7 +521,7 @@ func TestDialStateCache(t *testing.T) {
 
 func TestDialResolve(t *testing.T) {
 	config := &Config{
-		Logger: log.Logger(t, log.LvlTrace),
+		Logger: log.New(),
 		Dialer: TCPDialer{&net.Dialer{Deadline: time.Now().Add(-5 * time.Minute)}},
 	}
 	resolved := newNode(uintID(1), net.IP{127, 0, 55, 234})

@@ -75,7 +75,7 @@ func startTestServer(t *testing.T, remoteKey *ecdsa.PublicKey, pf func(*Peer)) *
 		MaxPeers:   10,
 		ListenAddr: "127.0.0.1:0",
 		PrivateKey: newkey(),
-		Logger:     log.Logger(t, log.LvlTrace),
+		Logger:     log.New(),
 	}
 	server := &Server{
 		Config:       config,
@@ -552,7 +552,7 @@ func TestServerSetupConn(t *testing.T) {
 				NoDial:      true,
 				NoDiscovery: true,
 				Protocols:   []Protocol{discard},
-				Logger:      log.Logger(t, log.LvlTrace),
+				Logger:      log.New(),
 			}
 			srv := &Server{
 				Config:       cfg,
@@ -639,7 +639,7 @@ func TestServerInboundThrottle(t *testing.T) {
 			NoDial:      true,
 			NoDiscovery: true,
 			Protocols:   []Protocol{discard},
-			Logger:      log.Logger(t, log.LvlTrace),
+			Logger:      log.New(),
 		},
 		newTransport: func(fd net.Conn) transport {
 			newTransportCalled <- struct{}{}
