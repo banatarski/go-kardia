@@ -32,7 +32,7 @@ import (
 	"github.com/kardiachain/go-kardia/lib/event"
 	"github.com/kardiachain/go-kardia/lib/log"
 	"github.com/kardiachain/go-kardia/lib/p2p"
-	"github.com/kardiachain/go-kardia/lib/p2p/discover"
+	"github.com/kardiachain/go-kardia/lib/p2p/enode"
 	"github.com/kardiachain/go-kardia/mainchain/tx_pool"
 	"github.com/kardiachain/go-kardia/types"
 )
@@ -44,6 +44,8 @@ const (
 	// The number is referenced from the size of tx pool.
 	txChanSize = 4096
 	csChanSize = 4096 // Consensus channel size.
+
+	protocolName = "kai"
 )
 
 // errIncompatibleConfig is returned if the requested protocols and configs are
@@ -154,7 +156,7 @@ func NewProtocolManager(
 			NodeInfo: func() interface{} {
 				return manager.NodeInfo()
 			},
-			PeerInfo: func(id discover.NodeID) interface{} {
+			PeerInfo: func(id enode.ID) interface{} {
 				if p := manager.peers.Peer(fmt.Sprintf("%x", id[:8])); p != nil {
 					return p.Info()
 				}

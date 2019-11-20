@@ -25,12 +25,20 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/kardiachain/go-kardia/consensus"
+	"github.com/kardiachain/go-kardia/dualchain/event_pool"
+	"github.com/kardiachain/go-kardia/kai/base"
+	"github.com/kardiachain/go-kardia/kai/storage"
 	"github.com/kardiachain/go-kardia/lib/common"
 	"github.com/kardiachain/go-kardia/lib/crypto"
 	"github.com/kardiachain/go-kardia/lib/log"
 	"github.com/kardiachain/go-kardia/lib/p2p"
 	"github.com/kardiachain/go-kardia/lib/p2p/enode"
+	"github.com/kardiachain/go-kardia/mainchain/genesis"
+	"github.com/kardiachain/go-kardia/mainchain/permissioned"
+	"github.com/kardiachain/go-kardia/mainchain/tx_pool"
 	"github.com/kardiachain/go-kardia/rpc"
+	"github.com/kardiachain/go-kardia/types"
 )
 
 const (
@@ -40,6 +48,94 @@ const (
 	datadirTrustedNodes    = "trusted-nodes.json" // Path within the datadir to the trusted node list
 	datadirNodeDatabase    = "nodes"              // Path within the datadir to store the node infos
 )
+
+type MainChainConfig struct {
+	// Mainchain
+
+	// Index of validators
+	ValidatorIndexes []int
+
+	// DbInfo stores configuration information to setup database
+	DBInfo storage.DbInfo
+
+	// Genesis is genesis block which contain initial Block and accounts
+	Genesis *genesis.Genesis
+
+	// Transaction pool options
+	TxPool tx_pool.TxPoolConfig
+
+	// AcceptTxs accept tx sync process or not (1 is yes and 0 is no)
+	AcceptTxs uint32
+
+	// IsZeroFee is true then sender will be refunded all gas spent for a transaction
+	IsZeroFee bool
+
+	// IsPrivate is true then peerId will be checked through smc to make sure that it has permission to access the chain
+	IsPrivate bool
+
+	NetworkId uint64
+
+	ChainId uint64
+
+	// ServiceName is used as log's prefix
+	ServiceName string
+
+	// BaseAccount defines account which is used to execute internal smart contracts
+	BaseAccount *types.BaseAccount
+
+	// ======== DEV ENVIRONMENT CONFIG =========
+	// Configuration of this environment when running in dev environment.
+	EnvConfig *EnvironmentConfig
+}
+
+type DualChainConfig struct {
+	// Dualchain
+
+	ChainId uint64 // ID of dual chain unique to a dualnode group, such as for dual eth.
+
+	// Index of validators
+	ValidatorIndexes []int
+
+	// DbInfo stores configuration information to setup database
+	DBInfo storage.DbInfo
+
+	// Genesis is genesis block which contain initial Block and accounts
+	DualGenesis *genesis.Genesis
+
+	// Dual's event pool options
+	DualEventPool event_pool.Config
+
+	// IsPrivate is true then peerId will be checked through smc to make sure that it has permission to access the chain
+	IsPrivate bool
+
+	// Dual protocol name, this name is used if the node is setup as dual node
+	DualProtocolName string
+
+	// BaseAccount defines account which is used to execute internal smart contracts
+	BaseAccount *types.BaseAccount
+
+	// ======== DEV ENVIRONMENT CONFIG =========
+	// Configuration of this environment when running in dev environment.
+	EnvConfig *EnvironmentConfig
+
+	// Dual Network ID
+	DualNetworkID uint64
+}
+
+// NodeMetadata contains privateKey and votingPower and function that get coinbase
+type NodeMetadata struct {
+	PrivKey     *ecdsa.PrivateKey
+	PublicKey   *ecdsa.PublicKey
+	VotingPower int64
+	ListenAddr  string
+}
+
+// EnvironmentConfig contains a list of NodeVotingPower, proposalIndex and votingStrategy
+type EnvironmentConfig struct {
+	NodeSet        []NodeMetadata
+	proposalIndex  int
+	VotingStrategy map[consensus.VoteTurn]int
+}
 
 // Config represents a small collection of configuration values to fine tune the
 // P2P network layer of a protocol stack. These values can be further extended by
@@ -185,6 +281,22 @@ type Config struct {
 	staticNodesWarning     bool
 	trustedNodesWarning    bool
 	oldGethResourceWarning bool
+
+	// Configuration of the Kardia's blockchain (or main chain).
+	MainChainConfig MainChainConfig
+
+	// Configuration of the dual's blockchain.
+	DualChainConfig DualChainConfig
+
+	// PeerProxyIP is IP of the network peer proxy, when participates in network with peer proxy for discovery.
+	PeerProxyIP string
+
+	// BaseAccount defines account which is used to execute internal smart contracts
+	BaseAccount *types.BaseAccount
+
+	// ======== DEV ENVIRONMENT CONFIG =========
+	// Configuration of this node when running in dev environment.
+	NodeMetadata *NodeMetadata
 }
 
 // IPCEndpoint resolves an IPC endpoint based on a configured value, taking into
@@ -444,4 +556,78 @@ func (c *Config) warnOnce(w *bool, format string, args ...interface{}) {
 	}
 	l.Warn(fmt.Sprintf(format, args...))
 	*w = true
+}
+
+// NewNodeMetadata init new NodeMetadata
+func NewNodeMetadata(privateKey *string, publicKey *string, votingPower int64, listenAddr string) (*NodeMetadata, error) {
+
+	node := &NodeMetadata{
+		VotingPower: votingPower,
+		ListenAddr:  listenAddr,
+	}
+
+	if privateKey == nil && publicKey == nil {
+		return nil, fmt.Errorf("PrivateKey or PublicKey is required")
+	}
+	// Set PrivKey if privateKey is not nil
+	if privateKey != nil {
+		privKey, err := crypto.StringToPrivateKey(*privateKey)
+		if err != nil {
+			return nil, err
+		}
+		node.PrivKey = privKey
+		node.PublicKey = &privKey.PublicKey
+	}
+	// Set PublicKey if publicKey is not nil
+	if publicKey != nil {
+		pubKey, err := crypto.StringToPublicKey(*publicKey)
+		if err != nil {
+			return nil, err
+		}
+		node.PublicKey = pubKey
+	}
+	return node, nil
+}
+
+// GetValidatorSet gets list of validators from permission smc defined in config and a list of indices.
+func GetValidatorSet(bc base.BaseBlockChain, valIndexes []int) (*types.ValidatorSet, error) {
+	nodes, err := GetNodeMetadataFromSmc(&bc, valIndexes)
+	if err != nil {
+		return nil, err
+	}
+	validators := make([]*types.Validator, 0)
+	for i := 0; i < len(valIndexes); i++ {
+		if valIndexes[i] < 0 {
+			return nil, fmt.Errorf("value of validator must be greater than 0")
+		}
+		node := nodes[i]
+		validators = append(validators, types.NewValidator(*node.PublicKey, node.VotingPower))
+	}
+	// TODO(huny@): Pass the start/end block height of the initial set of validator from the
+	// genesis here. Default to 0 and 100000000000 for now.
+	validatorSet := types.NewValidatorSet(validators, 0 /*start height*/, 100000000000 /*end height*/)
+	return validatorSet, nil
+}
+
+// GetNodeMetadataFromSmc gets nodes list from smartcontract
+func GetNodeMetadataFromSmc(bc *base.BaseBlockChain, valIndices []int) ([]NodeMetadata, error) {
+	util, err := permissioned.NewSmcPermissionUtil(*bc)
+	if err != nil {
+		return nil, err
+	}
+	nodes := make([]NodeMetadata, 0)
+	for _, idx := range valIndices {
+		// Get nodes by list of indices.
+		// Note: this is used for dev environement only.
+		pubString, _, listenAddr, votingPower, _, err := util.GetAdminNodeByIndex(int64(idx))
+		if err != nil {
+			return nil, err
+		}
+		n, err := NewNodeMetadata(nil, &pubString, votingPower.Int64(), listenAddr)
+		if err != nil {
+			return nil, err
+		}
+		nodes = append(nodes, *n)
+	}
+	return nodes, nil
 }

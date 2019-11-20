@@ -31,7 +31,7 @@ import (
 // the protocol stack, that is passed to all constructors to be optionally used;
 // as well as utility methods to operate on the service environment.
 type ServiceContext struct {
-	config         *Config
+	Config         *Config
 	services       map[reflect.Type]Service // Index of the already constructed services
 	EventMux       *event.TypeMux           // Event multiplexer used for decoupled notifications
 	AccountManager *accounts.Manager        // Account manager created by the node.
@@ -41,17 +41,22 @@ type ServiceContext struct {
 // if no previous can be found) from within the node's data directory. If the
 // node is an ephemeral one, a memory database is returned.
 func (ctx *ServiceContext) OpenDatabase(name string, cache int, handles int, namespace string) (types.StoreDB, error) {
-	if ctx.config.DataDir == "" {
+	if ctx.Config.DataDir == "" {
 		return storage.NewMemoryDatabase(), nil
 	}
-	return storage.NewLevelDBDatabase(ctx.config.ResolvePath(name), cache, handles, namespace)
+	return storage.NewLevelDBDatabase(ctx.Config.ResolvePath(name), cache, handles, namespace)
+}
+
+// Database starts a new or existed database in the node data directory, or in-memory database.
+func (c *ServiceContext) StartDatabase(dbInfo storage.DbInfo) (types.StoreDB, error) {
+	return dbInfo.Start()
 }
 
 // ResolvePath resolves a user path into the data directory if that was relative
 // and if the user actually uses persistent storage. It will return an empty string
 // for emphemeral storage and the user's own input for absolute paths.
 func (ctx *ServiceContext) ResolvePath(path string) string {
-	return ctx.config.ResolvePath(path)
+	return ctx.Config.ResolvePath(path)
 }
 
 // Service retrieves a currently running service registered of a specific type.
@@ -67,7 +72,7 @@ func (ctx *ServiceContext) Service(service interface{}) error {
 // ExtRPCEnabled returns the indicator whether node enables the external
 // RPC(http, ws or graphql).
 func (ctx *ServiceContext) ExtRPCEnabled() bool {
-	return ctx.config.ExtRPCEnabled()
+	return ctx.Config.ExtRPCEnabled()
 }
 
 // ServiceConstructor is the function signature of the constructors needed to be
@@ -98,4 +103,6 @@ type Service interface {
 	// Stop terminates all goroutines belonging to the service, blocking until they
 	// are all terminated.
 	Stop() error
+
+	DB() types.StoreDB
 }

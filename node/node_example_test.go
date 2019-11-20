@@ -21,8 +21,9 @@ import (
 	"log"
 
 	"github.com/kardiachain/go-kardia/lib/p2p"
-	"github.com/kardiachain/go-kardia/rpc"
 	"github.com/kardiachain/go-kardia/node"
+	"github.com/kardiachain/go-kardia/rpc"
+	"github.com/kardiachain/go-kardia/types"
 )
 
 // SampleService is a trivial network service that can be attached to a node for
@@ -39,6 +40,7 @@ func (s *SampleService) Protocols() []p2p.Protocol { return nil }
 func (s *SampleService) APIs() []rpc.API           { return nil }
 func (s *SampleService) Start(*p2p.Server) error   { fmt.Println("Service starting..."); return nil }
 func (s *SampleService) Stop() error               { fmt.Println("Service stopping..."); return nil }
+func (s *SampleService) DB() types.StoreDB         { return nil }
 
 func ExampleService() {
 	// Create a network node to run protocols with the default values.

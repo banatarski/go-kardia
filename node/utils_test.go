@@ -24,6 +24,7 @@ import (
 
 	"github.com/kardiachain/go-kardia/lib/p2p"
 	"github.com/kardiachain/go-kardia/rpc"
+	"github.com/kardiachain/go-kardia/types"
 )
 
 // NoopService is a trivial implementation of the Service interface.
@@ -33,6 +34,7 @@ func (s *NoopService) Protocols() []p2p.Protocol { return nil }
 func (s *NoopService) APIs() []rpc.API           { return nil }
 func (s *NoopService) Start(*p2p.Server) error   { return nil }
 func (s *NoopService) Stop() error               { return nil }
+func (s *NoopService) DB() types.StoreDB         { return nil }
 
 func NewNoopService(*ServiceContext) (Service, error) { return new(NoopService), nil }
 
@@ -85,6 +87,8 @@ func (s *InstrumentedService) Stop() error {
 	}
 	return s.stop
 }
+
+func (s *InstrumentedService) DB() types.StoreDB { return nil }
 
 // InstrumentingWrapper is a method to specialize a service constructor returning
 // a generic InstrumentedService into one returning a wrapping specific one.

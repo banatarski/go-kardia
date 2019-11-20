@@ -22,6 +22,7 @@ import (
 	"path/filepath"
 	"runtime"
 
+	"github.com/kardiachain/go-kardia/kai/storage"
 	"github.com/kardiachain/go-kardia/lib/p2p"
 	"github.com/kardiachain/go-kardia/lib/p2p/nat"
 	"github.com/kardiachain/go-kardia/rpc"
@@ -34,23 +35,43 @@ const (
 	DefaultWSPort      = 8546        // Default TCP port for the websocket RPC server
 	DefaultGraphQLHost = "localhost" // Default host interface for the GraphQL server
 	DefaultGraphQLPort = 8547        // Default TCP port for the GraphQL server
+
+	DefaultDbCache   = 16 // 16MB memory allocated for leveldb cache, for each chains
+	DefaultDbHandles = 32 // 32 file handlers allocated for leveldb, for each chains
+
+	MainChainDataDir = "chaindata" // directory of database storage for main chain data
+	DualChainDataDir = "dualdata"  // directory of database storage for dual chain data
+
+	DefaultNetworkID  = 100
+	MainChainID       = 1
+	KardiaServiceName = "KARDIA"
 )
 
 // DefaultConfig contains reasonable default settings.
 var DefaultConfig = Config{
 	DataDir:             DefaultDataDir(),
 	HTTPPort:            DefaultHTTPPort,
-	HTTPModules:         []string{"net", "web3"},
-	HTTPVirtualHosts:    []string{"localhost"},
+	HTTPModules:         []string{"node", "kai", "tx", "account", "dual", "neo"},
+	HTTPVirtualHosts:    []string{"0.0.0.0", "localhost"},
+	HTTPCors:            []string{"*"},
 	HTTPTimeouts:        rpc.DefaultHTTPTimeouts,
 	WSPort:              DefaultWSPort,
-	WSModules:           []string{"net", "web3"},
+	WSModules:           []string{"node", "kai", "tx", "account", "dual", "neo"},
 	GraphQLPort:         DefaultGraphQLPort,
 	GraphQLVirtualHosts: []string{"localhost"},
 	P2P: p2p.Config{
 		ListenAddr: ":30303",
 		MaxPeers:   50,
 		NAT:        nat.Any(),
+	},
+	MainChainConfig: MainChainConfig{
+		ServiceName: KardiaServiceName,
+		ChainId:     MainChainID,
+		NetworkId:   DefaultNetworkID,
+		AcceptTxs:   1, // 1 is to allow new transactions, 0 is not
+	},
+	DualChainConfig: DualChainConfig{
+		DBInfo: storage.NewLevelDbInfo(DualChainDataDir, DefaultDbCache, DefaultDbHandles),
 	},
 }
 

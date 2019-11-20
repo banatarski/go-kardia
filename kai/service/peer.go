@@ -19,13 +19,10 @@
 package service
 
 import (
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"sync"
 	"time"
-
-	"github.com/kardiachain/go-kardia/lib/crypto"
 
 	"github.com/kardiachain/go-kardia/consensus"
 	serviceconst "github.com/kardiachain/go-kardia/kai/service/const"
@@ -83,21 +80,21 @@ type peer struct {
 }
 
 func newPeer(logger log.Logger, version int, p *p2p.Peer, rw p2p.MsgReadWriter, csReactor *consensus.ConsensusManager) *peer {
-	isValidator := false
-	validators := csReactor.Validators()
-	pubKey, err := crypto.StringToPublicKey(hex.EncodeToString(p.ID().Bytes()))
-	if err != nil {
-		logger.Error("invalid peer", "id", p.ID().String())
-		return nil
-	}
-	address := crypto.PubkeyToAddress(*pubKey)
+	// isValidator := false
+	// validators := csReactor.Validators()
+	// pubKey, err := crypto.StringToPublicKey(hex.EncodeToString(p.ID().Bytes()))
+	// if err != nil {
+	// 	logger.Error("invalid peer", "id", p.ID().String())
+	// 	return nil
+	// }
+	// address := crypto.PubkeyToAddress(*pubKey)
 
-	for _, val := range validators {
-		if val.Address.Equal(address) {
-			isValidator = true
-			break
-		}
-	}
+	// for _, val := range validators {
+	// 	if val.Address.Equal(address) {
+	// 		isValidator = true
+	// 		break
+	// 	}
+	// }
 
 	return &peer{
 		logger:      logger,
@@ -109,7 +106,7 @@ func newPeer(logger log.Logger, version int, p *p2p.Peer, rw p2p.MsgReadWriter, 
 		knownTxs:    common.NewSet(maxKnownTxs),
 		csReactor:   csReactor,
 		terminated:  make(chan struct{}),
-		IsValidator: isValidator,
+		IsValidator: true,
 	}
 }
 

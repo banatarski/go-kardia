@@ -40,7 +40,6 @@ import (
 	"github.com/kardiachain/go-kardia/lib/common"
 	cmn "github.com/kardiachain/go-kardia/lib/common"
 	"github.com/kardiachain/go-kardia/lib/log"
-	"github.com/kardiachain/go-kardia/lib/p2p/discover"
 	"github.com/kardiachain/go-kardia/types"
 )
 
@@ -284,7 +283,7 @@ func (cs *ConsensusState) updateToState(state state.LastestBlockState) {
 // AddVote inputs a vote.
 func (cs *ConsensusState) AddVote(vote *types.Vote, peerID enode.ID) (added bool, err error) {
 	if peerID.IsZero() {
-		cs.internalMsgQueue <- msgInfo{&VoteMessage{vote}, discover.ZeroNodeID()}
+		cs.internalMsgQueue <- msgInfo{&VoteMessage{vote}, enode.ID{}}
 	} else {
 		cs.peerMsgQueue <- msgInfo{&VoteMessage{vote}, peerID}
 	}
@@ -317,10 +316,10 @@ func (cs *ConsensusState) decideProposal(height *cmn.BigInt, round *cmn.BigInt) 
 	if err := cs.privValidator.SignProposal(cs.state.ChainID, proposal); err == nil {
 		cs.logger.Info("Signed proposal", "height", height, "round", round, "proposal", propBlockID.Hash)
 		// send proposal and block parts on internal msg queue
-		cs.sendInternalMessage(msgInfo{&ProposalMessage{proposal}, discover.ZeroNodeID()})
+		cs.sendInternalMessage(msgInfo{&ProposalMessage{proposal}, enode.ID{}})
 		for i := 0; i < blockParts.Total(); i++ {
 			part := blockParts.GetPart(i)
-			cs.sendInternalMessage(msgInfo{&BlockPartMessage{cs.Height, cs.Round, part}, discover.ZeroNodeID()})
+			cs.sendInternalMessage(msgInfo{&BlockPartMessage{cs.Height, cs.Round, part}, enode.ID{}})
 		}
 		cs.logger.Info("Signed proposal", "height", height, "round", round, "proposal", proposal)
 		cs.logger.Debug(fmt.Sprintf("Signed proposal block: %s", block.Hash()))
@@ -641,7 +640,7 @@ func (cs *ConsensusState) signAddVote(type_ byte, hash common.Hash, header types
 	}
 	vote, err := cs.signVote(type_, hash, header)
 	if err == nil {
-		cs.sendInternalMessage(msgInfo{&VoteMessage{vote}, discover.ZeroNodeID()})
+		cs.sendInternalMessage(msgInfo{&VoteMessage{vote}, enode.ID{}})
 		cs.logger.Info("Signed and pushed vote", "height", cs.Height, "round", cs.Round, "vote", vote, "err", err)
 		return vote
 	}

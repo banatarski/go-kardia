@@ -17,6 +17,7 @@
 package enode
 
 import (
+	"bytes"
 	"crypto/ecdsa"
 	"encoding/base64"
 	"encoding/hex"
@@ -193,6 +194,12 @@ type ID [32]byte
 // Bytes returns a byte slice representation of the ID
 func (n ID) Bytes() []byte {
 	return n[:]
+}
+
+func (n ID) IsZero() bool {
+	zero := ID{}
+	return bytes.Equal(n[:], zero[:])
+
 }
 
 // ID prints as a long hexadecimal number.
