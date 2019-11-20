@@ -25,13 +25,14 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/kardiachain/go-kardia/lib/common"
-	"github.com/kardiachain/go-kardia/lib/crypto/sha3"
-	"github.com/kardiachain/go-kardia/lib/rlp"
 	"io"
 	"io/ioutil"
 	"math/big"
 	"os"
+
+	"github.com/kardiachain/go-kardia/lib/common"
+	"github.com/kardiachain/go-kardia/lib/crypto/sha3"
+	"github.com/kardiachain/go-kardia/lib/rlp"
 )
 
 var (
@@ -40,6 +41,12 @@ var (
 )
 
 var errInvalidPubkey = errors.New("invalid secp256k1 public key")
+
+//SignatureLength indicates the byte length required to carry a signature with recovery id.
+const SignatureLength = 64 + 1 // 64 bytes ECDSA signature + 1 byte recovery id
+
+// RecoveryIDOffset points to the byte offset within the signature that contains the recovery id.
+const RecoveryIDOffset = 64
 
 // Keccak256 calculates and returns the Keccak256 hash of the input data.
 func Keccak256(data ...[]byte) []byte {
