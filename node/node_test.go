@@ -1,149 +1,354 @@
-/*
- *  Copyright 2018 KardiaChain
- *  This file is part of the go-kardia library.
- *
- *  The go-kardia library is free software: you can redistribute it and/or modify
- *  it under the terms of the GNU Lesser General Public License as published by
- *  the Free Software Foundation, either version 3 of the License, or
- *  (at your option) any later version.
- *
- *  The go-kardia library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU Lesser General Public License for more details.
- *
- *  You should have received a copy of the GNU Lesser General Public License
- *  along with the go-kardia library. If not, see <http://www.gnu.org/licenses/>.
- */
-
 package node
 
 import (
+	"context"
+	"fmt"
+	"net"
+	"os"
+	"syscall"
 	"testing"
+	"time"
 
-	"github.com/kardiachain/go-kardia/lib/crypto"
-	"github.com/kardiachain/go-kardia/lib/p2p"
-	"github.com/kardiachain/go-kardia/rpc"
-	"github.com/kardiachain/go-kardia/types"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/tendermint/tendermint/abci/example/kvstore"
+	cfg "github.com/tendermint/tendermint/config"
+	"github.com/tendermint/tendermint/crypto/ed25519"
+	"github.com/tendermint/tendermint/evidence"
+	cmn "github.com/tendermint/tendermint/libs/common"
+	"github.com/tendermint/tendermint/libs/log"
+	mempl "github.com/tendermint/tendermint/mempool"
+	"github.com/tendermint/tendermint/p2p"
+	p2pmock "github.com/tendermint/tendermint/p2p/mock"
+	"github.com/tendermint/tendermint/privval"
+	"github.com/tendermint/tendermint/proxy"
+	sm "github.com/tendermint/tendermint/state"
+	"github.com/tendermint/tendermint/types"
+	tmtime "github.com/tendermint/tendermint/types/time"
+	"github.com/tendermint/tendermint/version"
+	dbm "github.com/tendermint/tm-db"
 )
 
-// Signatures of a simple test service.
-type TrivialService struct {
-	Started bool
-}
+func TestNodeStartStop(t *testing.T) {
+	config := cfg.ResetTestRoot("node_node_test")
+	defer os.RemoveAll(config.RootDir)
 
-func (s *TrivialService) Protocols() []p2p.Protocol {
-	return nil
-}
-func (s *TrivialService) Start(*p2p.Server) error {
-	s.Started = true
-	return nil
-}
-func (s *TrivialService) Stop() error {
-	s.Started = false
-	return nil
-}
+	// create & start node
+	n, err := DefaultNewNode(config, log.TestingLogger())
+	require.NoError(t, err)
+	err = n.Start()
+	require.NoError(t, err)
 
-func (s *TrivialService) APIs() []rpc.API {
-	return nil
-}
+	t.Logf("Started node %v", n.sw.NodeInfo())
 
-func (s *TrivialService) DB() types.StoreDB {
-	return nil
-}
-
-func newTrivialService(ctx *ServiceContext) (Service, error) { return new(TrivialService), nil }
-
-var (
-	testNodeKey, _ = crypto.GenerateKey()
-	nodes          = []map[string]interface{}{
-		{
-			"key":         "8843ebcb1021b00ae9a644db6617f9c6d870e5fd53624cefe374c1d2d710fd06",
-			"votingPower": 100,
-			"listenAddr":  "[::]:3000",
-		},
-		{
-			"key":         "77cfc693f7861a6e1ea817c593c04fbc9b63d4d3146c5753c008cfc67cffca79",
-			"votingPower": 100,
-			"listenAddr":  "[::]:3001",
-		},
-		{
-			"key":         "98de1df1e242afb02bd5dc01fbcacddcc9a4d41df95a66f629139560ca6e4dbb",
-			"votingPower": 100,
-			"listenAddr":  "[::]:3002",
-		},
+	// wait for the node to produce a block
+	blocksSub, err := n.EventBus().Subscribe(context.Background(), "node_test", types.EventQueryNewBlock)
+	require.NoError(t, err)
+	select {
+	case <-blocksSub.Out():
+	case <-blocksSub.Cancelled():
+		t.Fatal("blocksSub was cancelled")
+	case <-time.After(10 * time.Second):
+		t.Fatal("timed out waiting for the node to produce a block")
 	}
-)
 
-func testNodeConfig() *NodeConfig {
-	pk := "8843ebcb1021b00ae9a644db6617f9c6d870e5fd53624cefe374c1d2d710fd06"
-	nodeMetadata, _ := NewNodeMetadata(
-		&pk,
-		nil,
-		int64(100),
-		"[::]:3000",
+	// stop the node
+	go func() {
+		n.Stop()
+	}()
+
+	select {
+	case <-n.Quit():
+	case <-time.After(5 * time.Second):
+		pid := os.Getpid()
+		p, err := os.FindProcess(pid)
+		if err != nil {
+			panic(err)
+		}
+		err = p.Signal(syscall.SIGABRT)
+		fmt.Println(err)
+		t.Fatal("timed out waiting for shutdown")
+	}
+}
+
+func TestSplitAndTrimEmpty(t *testing.T) {
+	testCases := []struct {
+		s        string
+		sep      string
+		cutset   string
+		expected []string
+	}{
+		{"a,b,c", ",", " ", []string{"a", "b", "c"}},
+		{" a , b , c ", ",", " ", []string{"a", "b", "c"}},
+		{" a, b, c ", ",", " ", []string{"a", "b", "c"}},
+		{" a, ", ",", " ", []string{"a"}},
+		{"   ", ",", " ", []string{}},
+	}
+
+	for _, tc := range testCases {
+		assert.Equal(t, tc.expected, splitAndTrimEmpty(tc.s, tc.sep, tc.cutset), "%s", tc.s)
+	}
+}
+
+func TestNodeDelayedStart(t *testing.T) {
+	config := cfg.ResetTestRoot("node_delayed_start_test")
+	defer os.RemoveAll(config.RootDir)
+	now := tmtime.Now()
+
+	// create & start node
+	n, err := DefaultNewNode(config, log.TestingLogger())
+	n.GenesisDoc().GenesisTime = now.Add(2 * time.Second)
+	require.NoError(t, err)
+
+	err = n.Start()
+	require.NoError(t, err)
+	defer n.Stop()
+
+	startTime := tmtime.Now()
+	assert.Equal(t, true, startTime.After(n.GenesisDoc().GenesisTime))
+}
+
+func TestNodeSetAppVersion(t *testing.T) {
+	config := cfg.ResetTestRoot("node_app_version_test")
+	defer os.RemoveAll(config.RootDir)
+
+	// create & start node
+	n, err := DefaultNewNode(config, log.TestingLogger())
+	require.NoError(t, err)
+
+	// default config uses the kvstore app
+	var appVersion version.Protocol = kvstore.ProtocolVersion
+
+	// check version is set in state
+	state := sm.LoadState(n.stateDB)
+	assert.Equal(t, state.Version.Consensus.App, appVersion)
+
+	// check version is set in node info
+	assert.Equal(t, n.nodeInfo.(p2p.DefaultNodeInfo).ProtocolVersion.App, appVersion)
+}
+
+func TestNodeSetPrivValTCP(t *testing.T) {
+	addr := "tcp://" + testFreeAddr(t)
+
+	config := cfg.ResetTestRoot("node_priv_val_tcp_test")
+	defer os.RemoveAll(config.RootDir)
+	config.BaseConfig.PrivValidatorListenAddr = addr
+
+	dialer := privval.DialTCPFn(addr, 100*time.Millisecond, ed25519.GenPrivKey())
+	dialerEndpoint := privval.NewSignerDialerEndpoint(
+		log.TestingLogger(),
+		dialer,
 	)
-	return &NodeConfig{
-		Name:            "test node",
-		P2P:             p2p.Config{PrivateKey: testNodeKey},
-		MainChainConfig: MainChainConfig{},
-		NodeMetadata:    nodeMetadata,
-	}
+	privval.SignerDialerEndpointTimeoutReadWrite(100 * time.Millisecond)(dialerEndpoint)
+
+	signerServer := privval.NewSignerServer(
+		dialerEndpoint,
+		config.ChainID(),
+		types.NewMockPV(),
+	)
+
+	go func() {
+		err := signerServer.Start()
+		if err != nil {
+			panic(err)
+		}
+	}()
+	defer signerServer.Stop()
+
+	n, err := DefaultNewNode(config, log.TestingLogger())
+	require.NoError(t, err)
+	assert.IsType(t, &privval.SignerClient{}, n.PrivValidator())
 }
 
-// Tests that an empty node without service can be started, restarted and stopped.
-func TestNodeLifeCycle(t *testing.T) {
-	node, err := NewNode(testNodeConfig())
-	if err != nil {
-		t.Fatalf("failed to create node: %v", err)
-	}
-	// Tests stopping node that not running.
-	if err := node.Stop(); err != ErrNodeStopped {
-		t.Fatalf("unexpected stop error: %v instead of %v", err, ErrNodeStopped)
-	}
+// address without a protocol must result in error
+func TestPrivValidatorListenAddrNoProtocol(t *testing.T) {
+	addrNoPrefix := testFreeAddr(t)
 
-	// Tests starting node 2 times
-	if err := node.Start(); err != nil {
-		t.Fatalf("failed to start node: %v", err)
-	}
-	if err := node.Start(); err != ErrNodeRunning {
-		t.Fatalf("unexpected start error: %v instead of %v ", err, ErrNodeRunning)
-	}
-	// Tests stopping node 2 times
-	if err := node.Stop(); err != nil {
-		t.Fatalf("failed to stop node: %v", err)
-	}
-	if err := node.Stop(); err != ErrNodeStopped {
-		t.Fatalf("unexpected stop error: %v instead of %v ", err, ErrNodeStopped)
-	}
+	config := cfg.ResetTestRoot("node_priv_val_tcp_test")
+	defer os.RemoveAll(config.RootDir)
+	config.BaseConfig.PrivValidatorListenAddr = addrNoPrefix
+
+	_, err := DefaultNewNode(config, log.TestingLogger())
+	assert.Error(t, err)
 }
 
-func TestNodeRegisteringService(t *testing.T) {
-	node, err := NewNode(testNodeConfig())
-	if err != nil {
-		t.Fatalf("failed to create node: %v", err)
+func TestNodeSetPrivValIPC(t *testing.T) {
+	tmpfile := "/tmp/kms." + cmn.RandStr(6) + ".sock"
+	defer os.Remove(tmpfile) // clean up
+
+	config := cfg.ResetTestRoot("node_priv_val_tcp_test")
+	defer os.RemoveAll(config.RootDir)
+	config.BaseConfig.PrivValidatorListenAddr = "unix://" + tmpfile
+
+	dialer := privval.DialUnixFn(tmpfile)
+	dialerEndpoint := privval.NewSignerDialerEndpoint(
+		log.TestingLogger(),
+		dialer,
+	)
+	privval.SignerDialerEndpointTimeoutReadWrite(100 * time.Millisecond)(dialerEndpoint)
+
+	pvsc := privval.NewSignerServer(
+		dialerEndpoint,
+		config.ChainID(),
+		types.NewMockPV(),
+	)
+
+	go func() {
+		err := pvsc.Start()
+		require.NoError(t, err)
+	}()
+	defer pvsc.Stop()
+
+	n, err := DefaultNewNode(config, log.TestingLogger())
+	require.NoError(t, err)
+	assert.IsType(t, &privval.SignerClient{}, n.PrivValidator())
+}
+
+// testFreeAddr claims a free port so we don't block on listener being ready.
+func testFreeAddr(t *testing.T) string {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	defer ln.Close()
+
+	return fmt.Sprintf("127.0.0.1:%d", ln.Addr().(*net.TCPAddr).Port)
+}
+
+// create a proposal block using real and full
+// mempool and evidence pool and validate it.
+func TestCreateProposalBlock(t *testing.T) {
+	config := cfg.ResetTestRoot("node_create_proposal")
+	defer os.RemoveAll(config.RootDir)
+	cc := proxy.NewLocalClientCreator(kvstore.NewKVStoreApplication())
+	proxyApp := proxy.NewAppConns(cc)
+	err := proxyApp.Start()
+	require.Nil(t, err)
+	defer proxyApp.Stop()
+
+	logger := log.TestingLogger()
+
+	var height int64 = 1
+	state, stateDB := state(1, height)
+	maxBytes := 16384
+	state.ConsensusParams.Block.MaxBytes = int64(maxBytes)
+	proposerAddr, _ := state.Validators.GetByIndex(0)
+
+	// Make Mempool
+	memplMetrics := mempl.PrometheusMetrics("node_test")
+	mempool := mempl.NewCListMempool(
+		config.Mempool,
+		proxyApp.Mempool(),
+		state.LastBlockHeight,
+		mempl.WithMetrics(memplMetrics),
+		mempl.WithPreCheck(sm.TxPreCheck(state)),
+		mempl.WithPostCheck(sm.TxPostCheck(state)),
+	)
+	mempool.SetLogger(logger)
+
+	// Make EvidencePool
+	types.RegisterMockEvidencesGlobal() // XXX!
+	evidence.RegisterMockEvidences()
+	evidenceDB := dbm.NewMemDB()
+	evidencePool := evidence.NewEvidencePool(stateDB, evidenceDB)
+	evidencePool.SetLogger(logger)
+
+	// fill the evidence pool with more evidence
+	// than can fit in a block
+	minEvSize := 12
+	numEv := (maxBytes / types.MaxEvidenceBytesDenominator) / minEvSize
+	for i := 0; i < numEv; i++ {
+		ev := types.NewMockRandomGoodEvidence(1, proposerAddr, cmn.RandBytes(minEvSize))
+		err := evidencePool.AddEvidence(ev)
+		assert.NoError(t, err)
 	}
 
-	if err := node.RegisterService(newTrivialService); err != nil {
-		t.Fatalf("failed to register TrivialService: %v", err)
+	// fill the mempool with more txs
+	// than can fit in a block
+	txLength := 1000
+	for i := 0; i < maxBytes/txLength; i++ {
+		tx := cmn.RandBytes(txLength)
+		err := mempool.CheckTx(tx, nil, mempl.TxInfo{})
+		assert.NoError(t, err)
 	}
 
-	if err := node.Start(); err != nil {
-		t.Fatalf("failed to start node: %v", err)
-	}
+	blockExec := sm.NewBlockExecutor(
+		stateDB,
+		logger,
+		proxyApp.Consensus(),
+		mempool,
+		evidencePool,
+	)
 
-	var service *TrivialService
+	commit := types.NewCommit(types.BlockID{}, nil)
+	block, _ := blockExec.CreateProposalBlock(
+		height,
+		state, commit,
+		proposerAddr,
+	)
 
-	if err := node.Service(&service); err != nil {
-		t.Fatalf("TrivialService is not in service list of node: %v", err)
+	err = blockExec.ValidateBlock(state, block)
+	assert.NoError(t, err)
+}
+
+func TestNodeNewNodeCustomReactors(t *testing.T) {
+	config := cfg.ResetTestRoot("node_new_node_custom_reactors_test")
+	defer os.RemoveAll(config.RootDir)
+
+	cr := p2pmock.NewReactor()
+	customBlockchainReactor := p2pmock.NewReactor()
+
+	nodeKey, err := p2p.LoadOrGenNodeKey(config.NodeKeyFile())
+	require.NoError(t, err)
+
+	n, err := NewNode(config,
+		privval.LoadOrGenFilePV(config.PrivValidatorKeyFile(), config.PrivValidatorStateFile()),
+		nodeKey,
+		proxy.DefaultClientCreator(config.ProxyApp, config.ABCI, config.DBDir()),
+		DefaultGenesisDocProviderFunc(config),
+		DefaultDBProvider,
+		DefaultMetricsProvider(config.Instrumentation),
+		log.TestingLogger(),
+		CustomReactors(map[string]p2p.Reactor{"FOO": cr, "BLOCKCHAIN": customBlockchainReactor}),
+	)
+	require.NoError(t, err)
+
+	err = n.Start()
+	require.NoError(t, err)
+	defer n.Stop()
+
+	assert.True(t, cr.IsRunning())
+	assert.Equal(t, cr, n.Switch().Reactor("FOO"))
+
+	assert.True(t, customBlockchainReactor.IsRunning())
+	assert.Equal(t, customBlockchainReactor, n.Switch().Reactor("BLOCKCHAIN"))
+}
+
+func state(nVals int, height int64) (sm.State, dbm.DB) {
+	vals := make([]types.GenesisValidator, nVals)
+	for i := 0; i < nVals; i++ {
+		secret := []byte(fmt.Sprintf("test%d", i))
+		pk := ed25519.GenPrivKeyFromSecret(secret)
+		vals[i] = types.GenesisValidator{
+			Address: pk.PubKey().Address(),
+			PubKey:  pk.PubKey(),
+			Power:   1000,
+			Name:    fmt.Sprintf("test%d", i),
+		}
 	}
-	if !service.Started {
-		t.Fatalf("TrivialService didn't run Start()")
+	s, _ := sm.MakeGenesisState(&types.GenesisDoc{
+		ChainID:    "test-chain",
+		Validators: vals,
+		AppHash:    nil,
+	})
+
+	// save validators to db for 2 heights
+	stateDB := dbm.NewMemDB()
+	sm.SaveState(stateDB, s)
+
+	for i := 1; i < int(height); i++ {
+		s.LastBlockHeight++
+		s.LastValidators = s.Validators.Copy()
+		sm.SaveState(stateDB, s)
 	}
-	if err := node.Stop(); err != nil {
-		t.Fatalf("failed to stop node: %v", err)
-	}
-	if service.Started {
-		t.Fatalf("TrivialService didn't run Stop()")
-	}
+	return s, stateDB
 }
