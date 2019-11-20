@@ -45,6 +45,3 @@
 [[constraint]]
   name = "github.com/syndtr/goleveldb"
   branch = "master"
-
-
-  
