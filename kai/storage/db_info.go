@@ -84,9 +84,8 @@ func (info *LevelDbInfo) Start() (types.StoreDB, error) {
 	return kvstore.NewStoreDB(db), nil
 }
 
-func NewMemoryDatabase() (types.StoreDB, error) {
-	storeDB := kvstore.NewStoreDB(memorydb.New())
-	return storeDB, nil
+func NewMemoryDatabase() types.StoreDB {
+	return kvstore.NewStoreDB(memorydb.New())
 }
 
 // NewLevelDBDatabase creates a persistent key-value database without a freezer
