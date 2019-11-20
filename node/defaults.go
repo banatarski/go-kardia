@@ -24,7 +24,7 @@ import (
 
 	"github.com/kardiachain/go-kardia/lib/p2p"
 	"github.com/kardiachain/go-kardia/lib/p2p/nat"
-	"github.com/kardiachain/go-kardia/lib/rpc"
+	"github.com/kardiachain/go-kardia/rpc"
 )
 
 const (

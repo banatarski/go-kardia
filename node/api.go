@@ -25,7 +25,7 @@ import (
 	"github.com/kardiachain/go-kardia/lib/crypto"
 	"github.com/kardiachain/go-kardia/lib/p2p"
 	"github.com/kardiachain/go-kardia/lib/p2p/enode"
-	"github.com/kardiachain/go-kardia/lib/rpc"
+	"github.com/kardiachain/go-kardia/rpc"
 )
 
 // PrivateAdminAPI is the collection of administrative API methods exposed only

@@ -26,12 +26,12 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/kardiachain/go-kardia/kai/kaidb"
 	"github.com/kardiachain/go-kardia/kai/storage"
 	"github.com/kardiachain/go-kardia/lib/event"
 	"github.com/kardiachain/go-kardia/lib/log"
 	"github.com/kardiachain/go-kardia/lib/p2p"
-	"github.com/kardiachain/go-kardia/lib/rpc"
+	"github.com/kardiachain/go-kardia/rpc"
+	"github.com/kardiachain/go-kardia/types"
 	"github.com/prometheus/tsdb/fileutil"
 )
 
@@ -95,27 +95,21 @@ func New(conf *Config) (*Node, error) {
 	if strings.HasSuffix(conf.Name, ".ipc") {
 		return nil, errors.New(`Config.Name cannot end in ".ipc"`)
 	}
-	// Ensure that the AccountManager method works before the node has started.
-	// We rely on this in cmd/geth.
-	am, ephemeralKeystore, err := makeAccountManager(conf)
-	if err != nil {
-		return nil, err
-	}
+
 	if conf.Logger == nil {
 		conf.Logger = log.New()
 	}
 	// Note: any interaction with Config that would create/touch files
 	// in the data directory or instance directory is delayed until Start.
 	return &Node{
-		accman:            am,
-		ephemeralKeystore: ephemeralKeystore,
-		config:            conf,
-		serviceFuncs:      []ServiceConstructor{},
-		ipcEndpoint:       conf.IPCEndpoint(),
-		httpEndpoint:      conf.HTTPEndpoint(),
-		wsEndpoint:        conf.WSEndpoint(),
-		eventmux:          new(event.TypeMux),
-		log:               conf.Logger,
+
+		config:       conf,
+		serviceFuncs: []ServiceConstructor{},
+		ipcEndpoint:  conf.IPCEndpoint(),
+		httpEndpoint: conf.HTTPEndpoint(),
+		wsEndpoint:   conf.WSEndpoint(),
+		eventmux:     new(event.TypeMux),
+		log:          conf.Logger,
 	}, nil
 }
 
@@ -128,9 +122,7 @@ func (n *Node) Close() error {
 	if err := n.Stop(); err != nil && err != ErrNodeStopped {
 		errs = append(errs, err)
 	}
-	if err := n.accman.Close(); err != nil {
-		errs = append(errs, err)
-	}
+
 	// Report any errors that might have occurred
 	switch len(errs) {
 	case 0:
@@ -191,10 +183,9 @@ func (n *Node) Start() error {
 	for _, constructor := range n.serviceFuncs {
 		// Create a new context for the particular service
 		ctx := &ServiceContext{
-			config:         n.config,
-			services:       make(map[reflect.Type]Service),
-			EventMux:       n.eventmux,
-			AccountManager: n.accman,
+			config:   n.config,
+			services: make(map[reflect.Type]Service),
+			EventMux: n.eventmux,
 		}
 		for kind, s := range services { // copy needed for threaded access
 			ctx.services[kind] = s
@@ -598,7 +589,7 @@ func (n *Node) EventMux() *event.TypeMux {
 // OpenDatabase opens an existing database with the given name (or creates one if no
 // previous can be found) from within the node's instance directory. If the node is
 // ephemeral, a memory database is returned.
-func (n *Node) OpenDatabase(name string, cache, handles int, namespace string) (kaidb.Database, error) {
+func (n *Node) OpenDatabase(name string, cache, handles int, namespace string) (types.StoreDB, error) {
 	if n.config.DataDir == "" {
 		return storage.NewMemoryDatabase(), nil
 	}
@@ -622,10 +613,6 @@ func (n *Node) apis() []rpc.API {
 			Version:   "1.0",
 			Service:   NewPublicAdminAPI(n),
 			Public:    true,
-		}, {
-			Namespace: "debug",
-			Version:   "1.0",
-			Service:   debug.Handler,
 		}, {
 			Namespace: "web3",
 			Version:   "1.0",

@@ -43,7 +43,7 @@ func TestContextDatabases(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to open persistent database: %v", err)
 	}
-	db.Close()
+	db.DB().Close()
 
 	if _, err := os.Stat(filepath.Join(dir, "unit-test", "persistent")); err != nil {
 		t.Fatalf("persistent database doesn't exists: %v", err)
@@ -54,7 +54,7 @@ func TestContextDatabases(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to open ephemeral database: %v", err)
 	}
-	db.Close()
+	db.DB().Close()
 
 	if _, err := os.Stat(filepath.Join(dir, "ephemeral")); err == nil {
 		t.Fatalf("ephemeral database exists")
