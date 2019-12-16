@@ -156,7 +156,7 @@ var DefaultTxPoolConfig = TxPoolConfig{
 	PriceBump:  10,
 
 	AccountSlots: 64,
-	GlobalSlots:  16384,
+	GlobalSlots:  8192,
 	AccountQueue: 128,
 	GlobalQueue:  4096,
 
@@ -261,7 +261,6 @@ type txpoolResetRequest struct {
 func NewTxPool(config TxPoolConfig, chainconfig *types.ChainConfig, chain blockChain) *TxPool {
 	// Sanitize the input to ensure no vulnerable gas prices are set
 	config = (&config).sanitize()
-
 	// Create the transaction pool with its initial settings
 	pool := &TxPool{
 		config:          config,
