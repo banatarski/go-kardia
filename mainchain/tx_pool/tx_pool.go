@@ -331,21 +331,19 @@ func (pool *TxPool) notifyTxsAvailable() {
 	}
 }
 
+// State ...
 func (pool *TxPool) State() *state.StateDB {
 	return pool.currentState
 }
 
+// GetBlockChain ...
 func (pool *TxPool) GetBlockChain() blockChain {
 	return pool.chain
 }
 
+// PendingSize returns total txs
 func (pool *TxPool) PendingSize() int {
-	pending, _ := pool.Pending()
-	pendingSize := 0
-	for _, txs := range pending {
-		pendingSize += txs.Len()
-	}
-	return pendingSize
+	return pool.all.Count()
 }
 
 // ProposeTransactions collects transactions from pending and remove them.
@@ -353,7 +351,7 @@ func (pool *TxPool) ProposeTransactions() []*types.Transaction {
 	return pool.GetPendingData()
 }
 
-// ProposeTransactions collects transactions from pending and remove them.
+// GetPendingData collects transactions from pending and remove them.
 func (pool *TxPool) GetPendingData() []*types.Transaction {
 	txs := []*types.Transaction{}
 	pending, _ := pool.Pending()
