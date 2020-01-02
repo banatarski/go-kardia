@@ -22,6 +22,7 @@ import (
 	"crypto/ecdsa"
 	"flag"
 	"fmt"
+	"github.com/kardiachain/go-kardia/kai/base"
 	"io/ioutil"
 	"math/big"
 	"net/http"
@@ -504,7 +505,7 @@ func (c *Config) SaveWatchers(service node.Service, events []Event) {
 }
 
 // StartPump reads dual config and start dual service
-func (c *Config) StartPump(txPool *tx_pool.TxPool) error {
+func (c *Config) StartPump(txPool base.TxPool) error {
 	if c.GenTxs != nil {
 		go genTxsLoop(c.GenTxs, txPool, c.MainChain.TxPool.GlobalQueue)
 	} else {
@@ -515,7 +516,7 @@ func (c *Config) StartPump(txPool *tx_pool.TxPool) error {
 
 // genTxsLoop generate & add a batch of transfer txs, repeat after delay flag.
 // Warning: Set txsDelay < 5 secs may build up old subroutines because previous subroutine to add txs won't be finished before new one starts.
-func genTxsLoop(genTxs *GenTxs, txPool *tx_pool.TxPool, globalQueue uint64) {
+func genTxsLoop(genTxs *GenTxs, txPool base.TxPool, globalQueue uint64) {
 	time.Sleep(15 * time.Second) //decrease it if you want to test it locally
 	var accounts = make([]tool.Account, 0)
 	// get accounts
@@ -568,7 +569,7 @@ func genTxsLoop(genTxs *GenTxs, txPool *tx_pool.TxPool, globalQueue uint64) {
 	}
 }
 
-func generateTxs(genTxs *GenTxs, genTool *tool.GeneratorTool, txPool *tx_pool.TxPool) {
+func generateTxs(genTxs *GenTxs, genTool *tool.GeneratorTool, txPool base.TxPool) {
 	var txList types.Transactions
 	// Depends on generate txs
 	switch genTxs.Type {

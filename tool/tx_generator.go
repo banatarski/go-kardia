@@ -22,6 +22,7 @@ import (
 	"crypto/ecdsa"
 	"encoding/hex"
 	"fmt"
+	"github.com/kardiachain/go-kardia/kai/base"
 	"github.com/kardiachain/go-kardia/kvm"
 	"math"
 	"math/big"
@@ -191,7 +192,7 @@ func (genTool *GeneratorTool) GenerateRandomTxWithState(numTx int, stateDb *stat
 	return result
 }
 
-func (genTool *GeneratorTool) GenerateRandomTxWithAddressState(numTx int, txPool *tx_pool.TxPool) types.Transactions {
+func (genTool *GeneratorTool) GenerateRandomTxWithAddressState(numTx int, txPool base.TxPool) types.Transactions {
 	if numTx <= 0 || len(genTool.accounts) == 0 {
 		return nil
 	}
