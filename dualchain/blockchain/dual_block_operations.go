@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"github.com/kardiachain/go-kardia/consensus"
 	"github.com/kardiachain/go-kardia/kai/base"
+	"github.com/kardiachain/go-kardia/kvm"
 	"github.com/kardiachain/go-kardia/mainchain/tx_pool"
 	"math/big"
 	"sync"
@@ -47,6 +48,7 @@ type DualBlockOperations struct {
 
 	blockchain *DualBlockChain
 	eventPool  *event_pool.Pool
+	txPool     base.TxPool
 
 	bcManager *DualBlockChainManager
 
@@ -62,6 +64,10 @@ func NewDualBlockOperations(logger log.Logger, blockchain *DualBlockChain, event
 		eventPool:  eventPool,
 		height:     blockchain.CurrentHeader().Height,
 	}
+}
+
+func (dbo *DualBlockOperations) SetMainChainTxPool(txPool base.TxPool) {
+	dbo.txPool = txPool
 }
 
 func (dbo *DualBlockOperations) SetDualBlockChainManager(bcManager *DualBlockChainManager) {
@@ -153,6 +159,40 @@ func (dbo *DualBlockOperations) SaveBlock(block *types.Block, blockParts *types.
 	dbo.mtx.Lock()
 	dbo.height = height
 	dbo.mtx.Unlock()
+
+	if err := dbo.requestClaimReward(block); err != nil {
+		common.PanicSanity(common.Fmt("request claim request for validator:%v at height:%v failed error:%v", block.Header().Validator.Hex(), block.Height, err))
+	}
+
+	if err := dbo.requestNewConsensusPeriod(block); err != nil {
+		common.PanicSanity(common.Fmt("request new consensus period failed at block:%v error:%v", block.Height(), err))
+	}
+}
+
+func (dbo *DualBlockOperations) requestClaimReward(block *types.Block) error {
+	masterBc := dbo.txPool.GetBlockChain()
+	st, err := masterBc.State()
+	if err != nil {
+		return err
+	}
+	if err = kvm.RequestClaimDualReward(block.Height(), block.Header().Validator, masterBc.GetConsensusDualMasterSmartContract().Address, masterBc, st, dbo.txPool); err != nil && err == tx_pool.ErrReplaceUnderpriced {
+		// retry
+		return dbo.requestClaimReward(block)
+	}
+	return err
+}
+
+func (dbo *DualBlockOperations) requestNewConsensusPeriod(block *types.Block) error {
+	masterBc := dbo.txPool.GetBlockChain()
+	st, err := masterBc.State()
+	if err != nil {
+		return err
+	}
+	if err = kvm.RequestNewDualConsensusPeriod(block.Height(), masterBc.GetConsensusDualMasterSmartContract().FetchNewValidatorsTime, masterBc, st, dbo.txPool); err != nil && err == tx_pool.ErrReplaceUnderpriced {
+		// retry
+		return dbo.requestNewConsensusPeriod(block)
+	}
+	return err
 }
 
 // Returns the Block for the given height.
@@ -295,8 +335,8 @@ func (dbo *DualBlockOperations) Blockchain() base.BaseBlockChain {
 	return dbo.blockchain
 }
 
-func (dbo *DualBlockOperations) TxPool() *tx_pool.TxPool {
-	return nil
+func (dbo *DualBlockOperations) TxPool() base.TxPool {
+	return dbo.txPool
 }
 
 func (dbo *DualBlockOperations) IsDual() bool {

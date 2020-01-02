@@ -529,7 +529,7 @@ func Transfer(db base.StateDB, sender, recipient common.Address, amount *big.Int
 /**
 	Internal contract execution
  */
-const maximumGasUsed = uint64(7000000)
+const maximumGasUsed = uint64(8000000)
 
 func newInternalKVM(from common.Address, chain base.BaseBlockChain, statedb base.StateDB) *KVM {
 	ctx := NewInternalKVMContext(from, chain.CurrentHeader(), chain)
@@ -560,7 +560,7 @@ func EstimateGas(vm *KVM, to common.Address, input []byte) (uint64, error){
 	msg := types.NewMessage(vm.Origin, &to, 0, big.NewInt(0), maximumGasUsed, big.NewInt(1), input, false)
 	// Apply the transaction to the current state (included in the env)
 	gp := new(types.GasPool).AddGas(common.MaxUint64)
-	_, gas, _, err := vm.Context.Chain.ApplyMessage(vm, msg, gp)
+	_, gas, _, err := vm.Chain.ApplyMessage(vm, msg, gp)
 	if err != nil {
 		return 0, err
 	}

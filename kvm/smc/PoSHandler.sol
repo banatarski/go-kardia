@@ -24,4 +24,5 @@ contract PoSHandler {
     function isViolatedNode(address node, uint64 maxViolatePercentage) public {}
     function createNode(string memory publicKey, string memory nodeName, uint16 rewardPercentage, uint64 lockedPeriod, uint256 minimumStakes) public {}
     function createStaker() public {}
+    function claimDualReward(address node, uint64 blockHeight) public {}
 }

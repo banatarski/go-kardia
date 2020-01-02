@@ -43,6 +43,7 @@ func ValidateBlock(state LastestBlockState, block *types.Block) error {
 
 type BlockStore interface {
 	CommitAndValidateBlockTxs(*types.Block) (cmn.Hash, error)
+	TxPool() base.TxPool
 }
 
 // Validates the block against the state, and saves the new state.
@@ -60,6 +61,10 @@ func ApplyBlock(logger log.Logger, st LastestBlockState, blockStore BlockStore, 
 		return st, err
 	}
 	// update the state with the block and responses
+	if st.IsDual {
+		// get mainchain bc instead of dual bc
+		bc = blockStore.TxPool().GetBlockChain()
+	}
 	st, err = updateState(logger, st, appHash, blockID, block.Header(), bc)
 	if err != nil {
 		return st, fmt.Errorf("commit failed for application: %v", err)
@@ -102,5 +107,6 @@ func updateState(logger log.Logger, state LastestBlockState, appHash cmn.Hash, b
 		LastValidators:              prevVals,
 		LastHeightValidatorsChanged: lastHeightValsChanged,
 		AppHash:                     appHash,
+		IsDual:                      state.IsDual,
 	}, nil
 }

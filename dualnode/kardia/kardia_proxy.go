@@ -32,7 +32,6 @@ import (
 	"github.com/kardiachain/go-kardia/lib/common"
 	"github.com/kardiachain/go-kardia/lib/event"
 	"github.com/kardiachain/go-kardia/lib/log"
-	"github.com/kardiachain/go-kardia/mainchain/tx_pool"
 	"github.com/kardiachain/go-kardia/types"
 )
 
@@ -50,7 +49,7 @@ type KardiaProxy struct {
 
 	// Kardia's mainchain stuffs.
 	kardiaBc     base.BaseBlockChain
-	txPool       *tx_pool.TxPool
+	txPool       base.TxPool
 	chainHeadCh  chan events.ChainHeadEvent // Used to subscribe for new blocks.
 	chainHeadSub event.Subscription
 
@@ -83,7 +82,7 @@ type CompleteRequestInput struct {
 	Pair string
 }
 
-func (p *KardiaProxy) Init(kardiaBc base.BaseBlockChain, txPool *tx_pool.TxPool, dualBc base.BaseBlockChain, dualEventPool *event_pool.Pool,
+func (p *KardiaProxy) Init(kardiaBc base.BaseBlockChain, txPool base.TxPool, dualBc base.BaseBlockChain, dualEventPool *event_pool.Pool,
 	publishedEndpoint, subscribedEndpoint *string) error {
 	// Create a specific logger for Kardia Proxy.
 	logger := log.New()
@@ -127,7 +126,7 @@ func (p *KardiaProxy) DualEventPool() *event_pool.Pool {
 }
 
 // KardiaTxPool returns Kardia Blockchain's tx pool
-func (p *KardiaProxy) KardiaTxPool() *tx_pool.TxPool {
+func (p *KardiaProxy) KardiaTxPool() base.TxPool {
 	return p.txPool
 }
 

@@ -28,6 +28,26 @@ import (
 	"math/big"
 )
 
+type TxPool interface {
+	EnableTxsAvailable()
+	TxsAvailable() <-chan struct{}
+	State() *state.StateDB
+	PendingSize() int
+	ProposeTransactions() []*types.Transaction
+	GetPendingData() []*types.Transaction
+	Stop()
+	SubscribeNewTxsEvent(ch chan<- events.NewTxsEvent) event.Subscription
+	GasPrice() *big.Int
+	Nonce(addr common.Address) uint64
+	Pending() (map[common.Address]types.Transactions, error)
+	AddLocals(txs []*types.Transaction) []error
+	AddLocal(tx *types.Transaction) error
+	AddRemotes(txs []*types.Transaction) []error
+	AddRemotesSync(txs []*types.Transaction) []error
+	AddRemote(tx *types.Transaction) error
+	GetBlockChain() BaseBlockChain
+}
+
 // StateDB is an KVM database for full state querying.
 type StateDB interface {
 	CreateAccount(common.Address)
@@ -107,8 +127,10 @@ type BaseBlockChain interface {
 	ApplyMessage(vm KVM, msg types.Message, gp *types.GasPool) ([]byte, uint64, bool, error)
 	GetFetchNewValidatorsTime() uint64
 	GetBlockReward() *big.Int
-	GetConsensusMasterSmartContract() pos.MasterSmartContract
+	GetDualBlockReward() *big.Int
+	GetConsensusMasterSmartContract() *pos.MasterInfo
 	GetConsensusNodeAbi() string
 	GetConsensusStakerAbi() string
+	GetConsensusDualMasterSmartContract() *pos.DualMasterInfo
 	CheckCommittedStateRoot(root common.Hash) bool
 }

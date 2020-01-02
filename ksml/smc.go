@@ -21,6 +21,7 @@ package ksml
 import (
 	"crypto/ecdsa"
 	"fmt"
+	"github.com/kardiachain/go-kardia/mainchain/blockchain"
 	"math/big"
 	"reflect"
 	"strconv"
@@ -335,7 +336,7 @@ func EstimateGas(from common.Address, to common.Address, currentHeader *types.He
 	defer kaiVm.Cancel()
 	// Apply the transaction to the current state (included in the env)
 	gp := new(types.GasPool).AddGas(common.MaxUint64)
-	_, gas, _, err := chain.ApplyMessage(kaiVm, msg, gp)
+	_, gas, _, err := blockchain.ApplyMessage(kaiVm, msg, gp)
 	if err != nil {
 		return 0, err
 	}

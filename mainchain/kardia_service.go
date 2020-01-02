@@ -22,6 +22,7 @@ package kai
 import (
 	"github.com/kardiachain/go-kardia/configs"
 	"github.com/kardiachain/go-kardia/consensus"
+	"github.com/kardiachain/go-kardia/kai/base"
 	"github.com/kardiachain/go-kardia/kai/service"
 	serviceconst "github.com/kardiachain/go-kardia/kai/service/const"
 	"github.com/kardiachain/go-kardia/kvm"
@@ -62,7 +63,7 @@ type KardiaService struct {
 	kaiDb types.StoreDB // Local key-value store endpoint. Each use types should use wrapper layer with unique prefixes.
 
 	// Handlers
-	txPool          *tx_pool.TxPool
+	txPool          base.TxPool
 	protocolManager *service.ProtocolManager
 	blockchain      *blockchain.BlockChain
 	csManager       *consensus.ConsensusManager
@@ -125,7 +126,7 @@ func newKardiaService(ctx *node.ServiceContext, config *Config) (*KardiaService,
 
 	// Initialization for consensus.
 	block := kai.blockchain.CurrentBlock()
-	validatorSet, err := kvm.CollectValidatorSet(kai.blockchain)
+	validatorSet, err := kvm.CollectMasterValidatorSet(kai.blockchain)
 	if err != nil {
 		return nil, err
 	}
@@ -134,13 +135,6 @@ func newKardiaService(ctx *node.ServiceContext, config *Config) (*KardiaService,
 		Hash:        block.Hash(),
 		PartsHeader: block.MakePartSet(types.BlockPartSizeBytes).Header(),
 	}
-	//logger.Info("Validators: ", "valIndex", ctx.Config.MainChainConfig.ValidatorIndexes)
-	//var validatorSet *types.ValidatorSet
-	//validatorSet, err = node.GetValidatorSet(kai.blockchain, ctx.Config.MainChainConfig.ValidatorIndexes)
-	//if err != nil {
-	//	logger.Error("Cannot get validator from indices", "indices", ctx.Config.MainChainConfig.ValidatorIndexes, "err", err)
-	//	return nil, err
-	//}
 
 	state := consensus.LastestBlockState{
 		ChainID:                     "kaicon", // TODO(thientn): considers merging this with protocolmanger.ChainID
@@ -152,6 +146,7 @@ func newKardiaService(ctx *node.ServiceContext, config *Config) (*KardiaService,
 		LastHeightValidatorsChanged: cmn.NewBigInt32(-1),
 		AppHash:                     kai.blockchain.ReadAppHash(block.Height()),
 		LastBlockTotalTx:            cmn.NewBigInt64(int64(block.NumTxs())),
+		IsDual: false,
 	}
 	consensusState := consensus.NewConsensusState(
 		kai.logger,
@@ -277,7 +272,7 @@ func (s *KardiaService) APIs() []rpc.API {
 	}
 }
 
-func (s *KardiaService) TxPool() *tx_pool.TxPool            { return s.txPool }
+func (s *KardiaService) TxPool() base.TxPool            { return s.txPool }
 func (s *KardiaService) BlockChain() *blockchain.BlockChain { return s.blockchain }
 func (s *KardiaService) ChainConfig() *types.ChainConfig    { return s.chainConfig }
 func (s *KardiaService) DB() types.StoreDB                  { return s.kaiDb }

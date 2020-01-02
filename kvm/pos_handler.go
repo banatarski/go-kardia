@@ -32,65 +32,39 @@ const (
 	PosHandlerAbi = `[
 	{
 		"constant": false,
-		"inputs": [],
-		"name": "createStaker",
-		"outputs": [],
-		"payable": false,
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"constant": false,
 		"inputs": [
 			{
-				"name": "publicKey",
-				"type": "string"
+				"internalType": "address",
+				"name": "dualMaster",
+				"type": "address"
 			},
 			{
-				"name": "nodeName",
-				"type": "string"
-			},
-			{
-				"name": "rewardPercentage",
-				"type": "uint16"
-			},
-			{
-				"name": "lockedPeriod",
-				"type": "uint64"
-			},
-			{
-				"name": "minimumStakes",
-				"type": "uint256"
-			}
-		],
-		"name": "createNode",
-		"outputs": [],
-		"payable": false,
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"constant": false,
-		"inputs": [
-			{
-				"name": "blockHeight",
-				"type": "uint64"
-			}
-		],
-		"name": "newConsensusPeriod",
-		"outputs": [],
-		"payable": false,
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"constant": false,
-		"inputs": [
-			{
+				"internalType": "address",
 				"name": "node",
 				"type": "address"
 			},
 			{
+				"internalType": "uint64",
+				"name": "blockHeight",
+				"type": "uint64"
+			}
+		],
+		"name": "claimDualReward",
+		"outputs": [],
+		"payable": false,
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"constant": false,
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "node",
+				"type": "address"
+			},
+			{
+				"internalType": "uint64",
 				"name": "blockHeight",
 				"type": "uint64"
 			}
@@ -105,15 +79,76 @@ const (
 		"constant": false,
 		"inputs": [
 			{
+				"internalType": "string",
+				"name": "publicKey",
+				"type": "string"
+			},
+			{
+				"internalType": "string",
+				"name": "nodeName",
+				"type": "string"
+			},
+			{
+				"internalType": "uint16",
+				"name": "rewardPercentage",
+				"type": "uint16"
+			},
+			{
+				"internalType": "uint64",
+				"name": "lockedPeriod",
+				"type": "uint64"
+			},
+			{
+				"internalType": "uint256",
+				"name": "minimumStakes",
+				"type": "uint256"
+			}
+		],
+		"name": "createNode",
+		"outputs": [],
+		"payable": false,
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"constant": false,
+		"inputs": [],
+		"name": "createStaker",
+		"outputs": [],
+		"payable": false,
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"constant": false,
+		"inputs": [
+			{
+				"internalType": "address",
 				"name": "node",
 				"type": "address"
 			},
 			{
+				"internalType": "uint64",
 				"name": "maxViolatePercentage",
 				"type": "uint64"
 			}
 		],
 		"name": "isViolatedNode",
+		"outputs": [],
+		"payable": false,
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"constant": false,
+		"inputs": [
+			{
+				"internalType": "uint64",
+				"name": "blockHeight",
+				"type": "uint64"
+			}
+		],
+		"name": "newConsensusPeriod",
 		"outputs": [],
 		"payable": false,
 		"stateMutability": "nonpayable",
@@ -126,6 +161,7 @@ const (
 	methodGetNodeInfo = "getNodeInfo"
 	methodGetNodeAddressFromOwner = "getNodeAddressFromOwner"
 	methodClaimReward = "claimReward"
+	methodRequestClaimReward = "requestClaimReward"
 	methodGetAvailableNodeIndex = "getAvailableNodeIndex"
 	methodGetAvailableNode = "getAvailableNode"
 	methodGetStakerInfo = "getStakerInfo"
@@ -133,12 +169,17 @@ const (
 	methodGetLatestValidatorsInfo = "getLatestValidatorsInfo"
 	methodGetLatestValidatorByIndex = "getLatestValidatorByIndex"
 	methodCollectValidators = "collectValidators"
+	methodInitValidators = "initValidators"
 	methodIsViolatedNode = "isViolatedNode"
 	methodGetRejectedValidatedInfo = "getRejectedValidatedInfo"
 	methodAddNode = "addNode"
 	methodAddStaker = "addStaker"
 	methodCreateNode = "createNode"
 	methodCreateStaker = "createStaker"
+	methodClaimDualReward = "claimDualReward"
+	methodDualAddressIndex = "dualAddressIndex"
+	methodSetGenesis = "setGenesis"
+	methodRequestCollectValidators = "requestCollectValidators"
 )
 
 var (
@@ -150,6 +191,7 @@ type (
 	availableNode struct {
 		NodeAddress common.Address `abi:"nodeAddress"`
 		Owner common.Address `abi:"owner"`
+		DualIndex uint64 `abi:"dualIndex"`
 		Stakes *big.Int `abi:"stakes"`
 		TotalStaker uint64 `abi:"totalStaker"`
 	}
@@ -182,6 +224,11 @@ type (
 		Stakes *big.Int `abi:"stakes"`
 		TotalStaker uint64 `abi:"totalStaker"`
 	}
+	dualValidator struct {
+		Node common.Address `abi:"node"`
+		Owner common.Address `abi:"owner"`
+		Stakes *big.Int `abi:"stakes"`
+	}
 	latestValidatorsInfo struct {
 		TotalNodes uint64 `abi:"totalNodes"`
 		StartAtBlock uint64 `abi:"startAtBlock"`
@@ -197,6 +244,11 @@ type (
 		RewardPercentage string  `abi:"rewardPercentage"`
 		LockedPeriod     uint64  `abi:"lockedPeriod"`
 		MinimumStakes    *big.Int`abi:"minimumStakes"`
+	}
+	claimDualRewardStruct struct {
+		DualMaster      common.Address `abi:"dualMaster"`
+		Node            common.Address `abi:"node"`
+		BlockHeight     uint64         `abi:"blockHeight"`
 	}
 	// posHandler.
 	 posHandler struct {}
@@ -221,6 +273,8 @@ func (p *posHandler) Run(in []byte, contract *Contract, ctx Context, state base.
 	switch method.Name {
 	case methodClaimReward:
 		return in, handleClaimReward(method, in, contract, ctx, state)
+	case methodClaimDualReward:
+		return in, handleClaimDualReward(method, in, contract, ctx, state)
 	case methodNewConsensusPeriod:
 		return in, handleNewConsensusPeriod(method, in, contract, ctx, state)
 	case methodIsViolatedNode:
@@ -433,4 +487,79 @@ func handleCreateStaker(contract *Contract, ctx Context, state base.StateDB) err
 		return err
 	}
 	return nil
+}
+
+func handleClaimDualReward(method *abi.Method, input []byte, contract *Contract, ctx Context, state base.StateDB) error {
+	var (
+		output []byte
+		err error
+		claimInput claimDualRewardStruct
+		masterAbi, dualMasterAbi abi.ABI
+		index uint64
+		isRewarded bool
+		nInfo *nodeInfo
+		stakeAmount *big.Int
+		stakers map[common.Address]*big.Int
+	)
+	vm := newInternalKVM(posHandlerAddress, ctx.Chain, state)
+	if err = method.Inputs.Unpack(&claimInput, input[4:]); err != nil {
+		return err
+	}
+	if masterAbi, err = abi.JSON(strings.NewReader(ctx.Chain.GetConsensusMasterSmartContract().ABI)); err != nil {
+		return err
+	}
+	if dualMasterAbi, err = abi.JSON(strings.NewReader(ctx.Chain.GetConsensusDualMasterSmartContract().ABI)); err != nil {
+		return err
+	}
+
+	// validate if contract address is valid by checking it on Master
+	if input, err = masterAbi.Pack(methodDualAddressIndex, claimInput.DualMaster); err != nil {
+		return err
+	}
+	if output, err = StaticCall(vm, ctx.Chain.GetConsensusMasterSmartContract().Address, input); err != nil {
+		return err
+	}
+	if err = masterAbi.Unpack(&index, methodDualAddressIndex, output); err != nil {
+		return err
+	}
+	if index == 0 {
+		return fmt.Errorf("cannot find dual master: %v", claimInput.DualMaster.Hex())
+	}
+
+	// check if blockHeight has been rewarded.
+	if input, err = dualMasterAbi.Pack(methodIsRewarded, claimInput.BlockHeight); err != nil {
+		return err
+	}
+	if output, err = StaticCall(vm, claimInput.DualMaster, input); err != nil {
+		return err
+	}
+	if err = dualMasterAbi.Unpack(&isRewarded, methodIsRewarded, output); err != nil {
+		return err
+	}
+	if isRewarded {
+		return fmt.Errorf("%v has been rewarded in dual:%v", claimInput.BlockHeight, contract.CodeAddr.Hex())
+	}
+
+	// validate if node's owner is sender or not.
+	if _, stakeAmount, stakers, err = getAvailableNodeInfo(ctx.Chain, state, contract.Caller(), claimInput.Node); err != nil {
+		return err
+	}
+
+	// reward to node and its stakers
+	blockReward, _ := big.NewInt(0).SetString(ctx.Chain.GetDualBlockReward().String(), 10)
+	if nInfo, err = getNodeInfo(ctx.Chain, state, contract.Caller(), claimInput.Node); err != nil {
+		return err
+	}
+	if nInfo == nil {
+		return fmt.Errorf("cannot find node's Info for address:%v", claimInput.Node.Hex())
+	}
+	stakersReward := big.NewInt(0).Mul(blockReward, big.NewInt(int64(nInfo.RewardPercentage)))
+	stakersReward = big.NewInt(0).Div(stakersReward, big.NewInt(100))
+	nodeReward := big.NewInt(0).Sub(blockReward, stakersReward)
+	// reward to node
+	if err = rewardToDualNode(claimInput.DualMaster, claimInput.Node, claimInput.BlockHeight, nodeReward, ctx, state); err != nil {
+		return err
+	}
+	// reward to stakers
+	return rewardToStakers(claimInput.Node, stakeAmount, stakers, stakersReward, claimInput.BlockHeight, ctx, state)
 }

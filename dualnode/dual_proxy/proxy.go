@@ -27,7 +27,6 @@ import (
 	"github.com/kardiachain/go-kardia/lib/common"
 	"github.com/kardiachain/go-kardia/lib/event"
 	"github.com/kardiachain/go-kardia/lib/log"
-	"github.com/kardiachain/go-kardia/mainchain/tx_pool"
 	"github.com/kardiachain/go-kardia/types"
 	"sync"
 )
@@ -45,7 +44,7 @@ type Proxy struct {
 	logger log.Logger // Logger for proxy service
 
 	kardiaBc   base.BaseBlockChain
-	txPool     *tx_pool.TxPool
+	txPool     base.TxPool
 
 	// Dual blockchain related fields
 	dualBc    base.BaseBlockChain
@@ -100,7 +99,7 @@ func (p *Proxy) KardiaBlockChain() base.BaseBlockChain {
 }
 
 // KardiaTxPool returns Kardia Blockchain's tx pool
-func (p *Proxy) KardiaTxPool() *tx_pool.TxPool {
+func (p *Proxy) KardiaTxPool() base.TxPool {
 	return p.txPool
 }
 
@@ -115,7 +114,7 @@ func (p *Proxy) Name() string {
 func NewProxy(
 	serviceName string,
 	kardiaBc base.BaseBlockChain,
-	txPool *tx_pool.TxPool,
+	txPool base.TxPool,
 	dualBc base.BaseBlockChain,
 	dualEventPool *event_pool.Pool,
 	publishedEndpoint string,

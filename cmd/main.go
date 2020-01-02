@@ -150,7 +150,7 @@ func (c *Config) getGenesis(isDual bool) (*genesis.Genesis, error) {
 	var err error
 	g := c.MainChain.Genesis
 	if isDual {
-		g = c.DualChain.Genesis
+		g = &Genesis{}
 	}
 	if g == nil {
 		ga = make(genesis.GenesisAlloc, 0)
@@ -178,8 +178,86 @@ func (c *Config) getGenesis(isDual bool) (*genesis.Genesis, error) {
 	}, nil
 }
 
+func (c *Config) loadConsensusInfo() (*pos.ConsensusInfo, error) {
+	genesisAmount, _ := big.NewInt(0).SetString(c.MainChain.Consensus.Deployment.Master.GenesisAmount, 10)
+	minimumStakes, _ := big.NewInt(0).SetString(c.MainChain.Consensus.MinimumStakes, 10)
+	blockReward, _ := big.NewInt(0).SetString(c.MainChain.Consensus.BlockReward, 10)
+	masterInfo := pos.MasterInfo {
+		Address:                     common.HexToAddress(c.MainChain.Consensus.Deployment.Master.Address),
+		ByteCode:                    common.Hex2Bytes(c.MainChain.Consensus.Compilation.Master.ByteCode),
+		ABI:                         strings.Replace(c.MainChain.Consensus.Compilation.Master.ABI, "'", "\"", -1),
+		GenesisAmount:               genesis.ToCell(genesisAmount.Int64()),
+		MaxViolatePercentageAllowed: c.MainChain.Consensus.MaxViolatePercentageAllowed,
+		FetchNewValidatorsTime:      c.MainChain.Consensus.FetchNewValidatorsTime,
+		BlockReward:                 blockReward,
+		MaxValidators:               c.MainChain.Consensus.MaxValidators,
+		ConsensusPeriodInBlock:      c.MainChain.Consensus.ConsensusPeriodInBlock,
+		MinimumStakes:               minimumStakes,
+		LockedPeriod:                c.MainChain.Consensus.LockedPeriod,
+		Nodes: pos.Nodes{
+			ABI:         strings.Replace(c.MainChain.Consensus.Compilation.Node.ABI, "'", "\"", -1),
+			ByteCode:    common.Hex2Bytes(c.MainChain.Consensus.Compilation.Node.ByteCode),
+			GenesisInfo: make([]pos.GenesisNodeInfo, 0),
+		},
+		Stakers: pos.Stakers{
+			ABI:         strings.Replace(c.MainChain.Consensus.Compilation.Staker.ABI, "'", "\"", -1),
+			ByteCode:    common.Hex2Bytes(c.MainChain.Consensus.Compilation.Staker.ByteCode),
+			GenesisInfo: make([]pos.GenesisStakeInfo, 0),
+		},
+		DualGenesis: make([]pos.DualGenesis, 0),
+	}
+	if len(c.MainChain.Consensus.DualGenesis) > 0 {
+		for _, dualGenesis := range c.MainChain.Consensus.DualGenesis {
+			masterInfo.DualGenesis = append(masterInfo.DualGenesis, pos.DualGenesis{
+				Name: dualGenesis.Name,
+				ByteCode:     common.Hex2Bytes(dualGenesis.ByteCode),
+				Address:      common.HexToAddress(dualGenesis.Address),
+				GenesisNodes: dualGenesis.GenesisNodes,
+			})
+		}
+	}
+	// get consensus info
+	consensus := pos.ConsensusInfo{
+		Master: &masterInfo,
+	}
+	// get Nodes
+	for _, n := range c.MainChain.Consensus.Deployment.Nodes {
+		consensus.Master.Nodes.GenesisInfo = append(consensus.Master.Nodes.GenesisInfo, pos.GenesisNodeInfo{
+			Address: common.HexToAddress(n.Address),
+			Owner:   common.HexToAddress(n.Owner),
+			PubKey:  n.PubKey,
+			Name:    n.Name,
+			RewardPercentage:  n.RewardPercentage,
+		})
+	}
+	// get stakers
+	for _, s := range c.MainChain.Consensus.Deployment.Stakers {
+		stakeAmount, _ := big.NewInt(0).SetString(s.StakeAmount, 10)
+		consensus.Master.Stakers.GenesisInfo = append(consensus.Master.Stakers.GenesisInfo, pos.GenesisStakeInfo{
+			Address:     common.HexToAddress(s.Address),
+			Owner:       common.HexToAddress(s.Owner),
+			StakedNode:  common.HexToAddress(s.StakedNode),
+			StakeAmount: genesis.ToCell(stakeAmount.Int64()),
+		})
+	}
+	// add dual chain consensus if exists.
+	if c.DualChain != nil {
+		dualBlockReward, _ := big.NewInt(0).SetString(c.DualChain.DualConsensus.BlockReward, 10)
+		consensus.DualMaster = &pos.DualMasterInfo{
+			ABI:                         strings.Replace(c.DualChain.DualConsensus.ABI, "'", "\"", -1),
+			Address:                     common.HexToAddress(c.DualChain.DualConsensus.DualMasterAddress),
+			MaxViolatePercentageAllowed: c.DualChain.DualConsensus.MaxViolatePercentageAllowed,
+			FetchNewValidatorsTime:      c.DualChain.DualConsensus.FetchNewValidatorsTime,
+			BlockReward:                 dualBlockReward,
+			MaxValidators:               c.DualChain.DualConsensus.MaxValidators,
+			ConsensusPeriodInBlock:      c.DualChain.DualConsensus.ConsensusPeriodInBlock,
+		}
+	}
+	return &consensus, nil
+}
+
 // getMainChainConfig gets mainchain's config from config
-func (c *Config) getMainChainConfig() (*node.MainChainConfig, error) {
+func (c *Config) getMainChainConfig(consensus *pos.ConsensusInfo) (*node.MainChainConfig, error) {
 	chain := c.MainChain
 	dbInfo := c.getDbInfo(false)
 	if dbInfo == nil {
@@ -193,59 +271,9 @@ func (c *Config) getMainChainConfig() (*node.MainChainConfig, error) {
 	if err != nil {
 		return nil, err
 	}
-	genesisAmount, _ := big.NewInt(0).SetString(c.MainChain.Consensus.Deployment.Master.GenesisAmount, 10)
-	minimumStakes, _ := big.NewInt(0).SetString(c.MainChain.Consensus.MinimumStakes, 10)
-	blockReward, _ := big.NewInt(0).SetString(c.MainChain.Consensus.BlockReward, 10)
-	// get consensus info
-	consensus := pos.ConsensusInfo{
-		BlockReward: blockReward,
-		FetchNewValidatorsTime: c.MainChain.Consensus.FetchNewValidatorsTime,
-		MaxValidators:   c.MainChain.Consensus.MaxValidators,
-		ConsensusPeriodInBlock: c.MainChain.Consensus.ConsensusPeriodInBlock,
-		MinimumStakes: minimumStakes,
-		MaxViolatePercentageAllowed: c.MainChain.Consensus.MaxViolatePercentageAllowed,
-		LockedPeriod: c.MainChain.Consensus.LockedPeriod,
-		Master:          pos.MasterSmartContract{
-			Address:       common.HexToAddress(c.MainChain.Consensus.Deployment.Master.Address),
-			ByteCode:      common.Hex2Bytes(c.MainChain.Consensus.Compilation.Master.ByteCode),
-			ABI:           strings.Replace(c.MainChain.Consensus.Compilation.Master.ABI, "'", "\"", -1),
-			GenesisAmount: genesis.ToCell(genesisAmount.Int64()),
-		},
-		Nodes:           pos.Nodes{
-			ABI:         strings.Replace(c.MainChain.Consensus.Compilation.Node.ABI, "'", "\"", -1),
-			ByteCode:    common.Hex2Bytes(c.MainChain.Consensus.Compilation.Node.ByteCode),
-			GenesisInfo: make([]pos.GenesisNodeInfo, 0),
-		},
-		Stakers:         pos.Stakers{
-			ABI:         strings.Replace(c.MainChain.Consensus.Compilation.Staker.ABI, "'", "\"", -1),
-			ByteCode:    common.Hex2Bytes(c.MainChain.Consensus.Compilation.Staker.ByteCode),
-			GenesisInfo: make([]pos.GenesisStakeInfo, 0),
-		},
-	}
-	// get Nodes
-	for _, n := range c.MainChain.Consensus.Deployment.Nodes {
-		consensus.Nodes.GenesisInfo = append(consensus.Nodes.GenesisInfo, pos.GenesisNodeInfo{
-			Address: common.HexToAddress(n.Address),
-			Owner:   common.HexToAddress(n.Owner),
-			PubKey:  n.PubKey,
-			Name:    n.Name,
-			RewardPercentage:  n.RewardPercentage,
-		})
-	}
-	// get stakers
-	for _, s := range c.MainChain.Consensus.Deployment.Stakers {
-		stakeAmount, _ := big.NewInt(0).SetString(s.StakeAmount, 10)
-		consensus.Stakers.GenesisInfo = append(consensus.Stakers.GenesisInfo, pos.GenesisStakeInfo{
-			Address:     common.HexToAddress(s.Address),
-			Owner:       common.HexToAddress(s.Owner),
-			StakedNode:  common.HexToAddress(s.StakedNode),
-			StakeAmount: genesis.ToCell(stakeAmount.Int64()),
-		})
-	}
 	// assign consensus to genesisData
-	genesisData.ConsensusInfo = consensus
+	genesisData.ConsensusInfo = *consensus
 	mainChainConfig := node.MainChainConfig{
-		ValidatorIndexes: c.MainChain.Validators,
 		DBInfo:           dbInfo,
 		Genesis:          genesisData,
 		TxPool:           c.getTxPoolConfig(),
@@ -302,6 +330,10 @@ func (c *Config) getNodeConfig() (*node.NodeConfig, error) {
 		return nil, err
 	}
 	p2pConfig.Name = n.Name
+	consensus, err := c.loadConsensusInfo()
+	if err != nil {
+		return nil, err
+	}
 	nodeConfig := node.NodeConfig{
 		Name:             n.Name,
 		DataDir:          n.DataDir,
@@ -315,7 +347,7 @@ func (c *Config) getNodeConfig() (*node.NodeConfig, error) {
 		DualChainConfig:  node.DualChainConfig{},
 		PeerProxyIP:      "",
 	}
-	mainChainConfig, err := c.getMainChainConfig()
+	mainChainConfig, err := c.getMainChainConfig(consensus)
 	if err != nil {
 		return nil, err
 	}
@@ -500,6 +532,7 @@ func (c *Config) StartDual(n *node.Node) error {
 		kardiaProxy.RegisterExternalChain(dualProxy)
 		dualProxy.RegisterInternalChain(kardiaProxy)
 
+		// start proxy
 		dualProxy.Start()
 		kardiaProxy.Start()
 	}

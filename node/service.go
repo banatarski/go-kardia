@@ -20,6 +20,7 @@ package node
 
 import (
 	"errors"
+	"reflect"
 
 	"github.com/kardiachain/go-kardia/types"
 
@@ -49,6 +50,19 @@ func (ctx *ServiceContext) GetService(typeName string) (Service, error) {
 		return running, nil
 	}
 	return nil, ErrServiceUnknown
+}
+
+func (ctx *ServiceContext) Service(returnedService interface{}) error {
+	// Get pointer with *Service type.
+	pointer := reflect.ValueOf(returnedService).Elem()
+	serviceName := pointer.Type().Elem().Name()
+
+	if registeredS, ok := ctx.Services[serviceName]; ok {
+		pointer.Set(reflect.ValueOf(registeredS))
+
+		return nil
+	}
+	return ErrServiceUnknown
 }
 
 // ServiceConstructor is the function signature of the constructors needed to be

@@ -32,6 +32,7 @@ contract Node {
     uint256 _minimumStakes;
     address payable _owner;
     address _master;
+    address _dualMaster;
 
     modifier isMaster {
         require(msg.sender == _master, "Only master can access this function");

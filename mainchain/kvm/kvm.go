@@ -20,8 +20,10 @@ package kvm
 
 import (
 	"github.com/kardiachain/go-kardia/kai/base"
+	"github.com/kardiachain/go-kardia/kai/events"
 	"github.com/kardiachain/go-kardia/kai/pos"
 	"github.com/kardiachain/go-kardia/kai/state"
+	"github.com/kardiachain/go-kardia/lib/event"
 	"math/big"
 
 	"github.com/kardiachain/go-kardia/kvm"
@@ -34,15 +36,23 @@ import (
 type ChainContext interface {
 	// GetHeader returns the hash corresponding to their hash.
 	CurrentHeader() *types.Header
-	GetHeader(common.Hash, uint64) *types.Header
 	Config() *types.ChainConfig
 	GetBlockByHeight(height uint64) *types.Block
 	CurrentBlock() *types.Block
-	ZeroFee() bool
-	GetBlockReward() *big.Int
-	GetConsensusMasterSmartContract() pos.MasterSmartContract
-	ApplyMessage(vm *kvm.KVM, msg types.Message, gp *types.GasPool) ([]byte, uint64, bool, error)
 	State() (*state.StateDB, error)
+	GetHeader(common.Hash, uint64) *types.Header
+	SubscribeChainHeadEvent(ch chan<- events.ChainHeadEvent) event.Subscription
+	StateAt(height uint64) (*state.StateDB, error)
+	DB() types.StoreDB
+	ZeroFee() bool
+	ApplyMessage(vm base.KVM, msg types.Message, gp *types.GasPool) ([]byte, uint64, bool, error)
+	GetFetchNewValidatorsTime() uint64
+	GetBlockReward() *big.Int
+	GetDualBlockReward() *big.Int
+	GetConsensusMasterSmartContract() *pos.MasterInfo
+	GetConsensusNodeAbi() string
+	GetConsensusStakerAbi() string
+	GetConsensusDualMasterSmartContract() *pos.DualMasterInfo
 }
 
 // StateDB is an KVM database for full state querying.

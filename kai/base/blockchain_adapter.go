@@ -21,7 +21,6 @@ package base
 import (
 	"github.com/kardiachain/go-kardia/dualchain/event_pool"
 	"github.com/kardiachain/go-kardia/lib/log"
-	"github.com/kardiachain/go-kardia/mainchain/tx_pool"
 	"github.com/kardiachain/go-kardia/types"
 )
 
@@ -60,7 +59,7 @@ type BlockChainAdapter interface {
 	KardiaBlockChain() BaseBlockChain
 
 	// KardiaTxPool returns Kardia Blockchain's tx pool
-	KardiaTxPool() *tx_pool.TxPool
+	KardiaTxPool() TxPool
 
 	// Name returns name of proxy (eg: NEO, TRX, ETH, KAI)
 	Name() string

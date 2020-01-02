@@ -46,6 +46,31 @@ func testDeployStaker(t *testing.T, bc *blockchain.BlockChain, st *state.StateDB
 	testAddStakerToMaster(t, bc, st, staker)
 }
 
+func testDeployDualMasterSmartContract(t *testing.T, dualMasterAbi abi.ABI, bc *blockchain.BlockChain, st *state.StateDB, consensusPeriod uint64, maxValidators uint64, maxViolatePercentage uint64) {
+	input, err := dualMasterAbi.Pack("", "ETH", consensusPeriod, maxValidators, maxViolatePercentage)
+	require.NoError(t, err)
+	sender := common.HexToAddress(genesisNodes[0]["owner"].(string))
+	newCode := append(DualMasterByteCode, input...)
+	_, _, _, err = create(sender, dualMasterAddress, bc.CurrentHeader(), bc, newCode, big.NewInt(0), st)
+	require.NoError(t, err)
+
+	// set genesis to DualMaster
+	input, err = dualMasterAbi.Pack("setGenesis", common.HexToAddress(genesisNodes[0]["address"].(string)), common.HexToAddress(genesisNodes[0]["owner"].(string)), minimumStakes)
+	require.NoError(t, err)
+	output, err := call(common.HexToAddress(genesisNodes[0]["address"].(string)), dualMasterAddress, bc.CurrentHeader(), bc, input, big.NewInt(0), st)
+	require.NoError(t, err, string(output))
+
+	input, err = dualMasterAbi.Pack("setGenesis", common.HexToAddress(genesisNodes[1]["address"].(string)), common.HexToAddress(genesisNodes[1]["owner"].(string)), minimumStakes)
+	require.NoError(t, err)
+	output, err = call(common.HexToAddress(genesisNodes[0]["address"].(string)), dualMasterAddress, bc.CurrentHeader(), bc, input, big.NewInt(0), st)
+	require.NoError(t, err, string(output))
+
+	input, err = dualMasterAbi.Pack("setGenesis", common.HexToAddress(genesisNodes[2]["address"].(string)), common.HexToAddress(genesisNodes[2]["owner"].(string)), minimumStakes)
+	require.NoError(t, err)
+	output, err = call(common.HexToAddress(genesisNodes[0]["address"].(string)), dualMasterAddress, bc.CurrentHeader(), bc, input, big.NewInt(0), st)
+	require.NoError(t, err, string(output))
+}
+
 func testStake(t *testing.T, bc *blockchain.BlockChain, st *state.StateDB, node map[string]interface{}, target *common.Address, stakeAmount, expectedStakes *big.Int) {
 	address := common.HexToAddress(node["address"].(string))
 	if target != nil {
@@ -152,41 +177,6 @@ func testAddStakerToMaster(t *testing.T, bc *blockchain.BlockChain, st *state.St
 	require.NoError(t, err)
 }
 
-func testAddStaker(t *testing.T, kAbi abi.ABI, bc *blockchain.BlockChain, st *state.StateDB) {
-	genesisSender := common.HexToAddress(genesisNodes[0]["owner"].(string))
-	for _, node := range normalNodes {
-		staker := common.HexToAddress(node["staker"].(string))
-		addStaker, err := kAbi.Pack("addStaker", staker)
-		require.NoError(t, err)
-
-		_, err = call(genesisSender, masterAddress, bc.CurrentHeader(), bc, addStaker, big.NewInt(0), st)
-		require.NoError(t, err)
-
-		isStaker, err := kAbi.Pack("isStaker", staker)
-		require.NoError(t, err)
-
-		isStakerResult, err := staticCall(common.HexToAddress(node["owner"].(string)), masterAddress, bc.CurrentHeader(), bc, isStaker, st)
-		require.NoError(t, err)
-
-		var isBool bool
-		err = kAbi.Unpack(&isBool, "isStaker", isStakerResult)
-		require.Equal(t, true, isBool)
-
-		getTotalStakes, err := kAbi.Pack("getTotalStakes", common.HexToAddress(node["address"].(string)))
-		require.NoError(t, err)
-
-		result, err := staticCall(common.HexToAddress(node["owner"].(string)), masterAddress, bc.CurrentHeader(), bc, getTotalStakes, st)
-		require.NoError(t, err)
-
-		var actual *big.Int
-		err = kAbi.Unpack(&actual, "getTotalStakes", result)
-		require.NoError(t, err)
-
-		expected := big.NewInt(0)
-		require.Equal(t, expected.String(), actual.String())
-	}
-}
-
 func testAvailableNodes(t *testing.T, masterAbi abi.ABI, bc *blockchain.BlockChain, st *state.StateDB, expectedLen uint64) {
 	sender := common.HexToAddress(genesisNodes[0]["owner"].(string))
 	getTotalAvailableNodes, err := masterAbi.Pack("getTotalAvailableNodes")
@@ -208,6 +198,7 @@ func testAvailableNodes(t *testing.T, masterAbi abi.ABI, bc *blockchain.BlockCha
 		type nodeInfo struct {
 			NodeAddress common.Address `abi:"nodeAddress"`
 			Owner common.Address `abi:"owner"`
+			DualIndex uint64 `abi:"dualIndex"`
 			Stakes *big.Int `abi:"stakes"`
 		}
 		var info nodeInfo
@@ -495,6 +486,7 @@ func testWithdraw(t *testing.T, masterAbi abi.ABI, bc *blockchain.BlockChain, st
 		NodeAddress common.Address `abi:"nodeAddress"`
 		Owner common.Address `abi:"owner"`
 		Stakes *big.Int `abi:"stakes"`
+		DualIndex uint64 `abi:"dualIndex"`
 	}
 
 	var (
@@ -655,20 +647,141 @@ func testRejectBlock(t *testing.T, masterAbi abi.ABI, nodeAddress, sender common
 	}
 }
 
-func setup(t *testing.T) (*blockchain.BlockChain, abi.ABI, *state.StateDB) {
+func testCollectDualValidators(t *testing.T, dualMasterAbi abi.ABI, bc *blockchain.BlockChain, st *state.StateDB) {
+	// in order to collect validators each genesis need to request collect validators until 2/3+1 number of validators or genesis (if validators list is empty)
+	type (
+		validatorsInfo struct {
+			TotalNodes uint64 `abi:"totalNodes"`
+			StartAtBlock uint64 `abi:"startAtBlock"`
+			EndAtBlock uint64 `abi:"endAtBlock"`
+		}
+		validatorInfo struct {
+			Node common.Address `abi:"node"`
+			Owner common.Address `abi:"owner"`
+			Stakes *big.Int      `abi:"stakes"`
+		}
+	)
+
+	var (
+		input, output []byte
+		err error
+		valsInfo validatorsInfo
+		valInfo validatorInfo
+	)
+
+	requestCollectValidators := "requestCollectValidators"
+	getLatestValidatorsInfo := "getLatestValidatorsInfo"
+	getLatestValidatorByIndex := "getLatestValidatorByIndex"
+
+	input, err = dualMasterAbi.Pack(requestCollectValidators)
+	require.NoError(t, err)
+	output, err = call(common.HexToAddress(genesisNodes[0]["owner"].(string)), dualMasterAddress, bc.CurrentHeader(), bc, input, big.NewInt(0), st)
+	require.NoError(t, err, string(output))
+
+	input, err = dualMasterAbi.Pack(requestCollectValidators)
+	require.NoError(t, err)
+	output, err = call(common.HexToAddress(genesisNodes[1]["owner"].(string)), dualMasterAddress, bc.CurrentHeader(), bc, input, big.NewInt(0), st)
+	require.NoError(t, err, string(output))
+
+	input, err = dualMasterAbi.Pack(requestCollectValidators)
+	require.NoError(t, err)
+	output, err = call(common.HexToAddress(genesisNodes[2]["owner"].(string)), dualMasterAddress, bc.CurrentHeader(), bc, input, big.NewInt(0), st)
+	require.NoError(t, err, string(output))
+
+	println("---- test get overall validators information")
+
+	input, err = dualMasterAbi.Pack(getLatestValidatorsInfo)
+	require.NoError(t, err)
+	output, err = staticCall(common.HexToAddress(genesisNodes[0]["owner"].(string)), dualMasterAddress, bc.CurrentHeader(), bc, input, st)
+	require.NoError(t, err)
+	err = dualMasterAbi.Unpack(&valsInfo, getLatestValidatorsInfo, output)
+	require.NoError(t, err)
+	require.Equal(t, uint64(1), valsInfo.StartAtBlock)
+	require.Equal(t, uint64(3), valsInfo.TotalNodes)
+
+	println("---- test get validator information by its index")
+	input, err = dualMasterAbi.Pack(getLatestValidatorByIndex, uint64(1))
+	require.NoError(t, err)
+	output, err = staticCall(common.HexToAddress(genesisNodes[0]["owner"].(string)), dualMasterAddress, bc.CurrentHeader(), bc, input, st)
+	require.NoError(t, err, string(output))
+	err = dualMasterAbi.Unpack(&valInfo, getLatestValidatorByIndex, output)
+	require.NoError(t, err)
+	println(fmt.Sprintf("------ Index:%v address:%v owner:%v stakes:%v", 1, valInfo.Node.Hex(), valInfo.Owner.Hex(), valInfo.Stakes.String()))
+	require.Equal(t, genesisNodes[0]["address"].(string), valInfo.Node.Hex())
+	require.Equal(t, genesisNodes[0]["owner"].(string), valInfo.Owner.Hex())
+
+	input, err = dualMasterAbi.Pack(getLatestValidatorByIndex, uint64(2))
+	require.NoError(t, err)
+	output, err = staticCall(common.HexToAddress(genesisNodes[0]["owner"].(string)), dualMasterAddress, bc.CurrentHeader(), bc, input, st)
+	require.NoError(t, err, string(output))
+	err = dualMasterAbi.Unpack(&valInfo, getLatestValidatorByIndex, output)
+	require.NoError(t, err)
+	println(fmt.Sprintf("------ Index:%v address:%v owner:%v stakes:%v", 2, valInfo.Node.Hex(), valInfo.Owner.Hex(), valInfo.Stakes.String()))
+	require.Equal(t, genesisNodes[1]["address"].(string), valInfo.Node.Hex())
+	require.Equal(t, genesisNodes[1]["owner"].(string), valInfo.Owner.Hex())
+
+	input, err = dualMasterAbi.Pack(getLatestValidatorByIndex, uint64(3))
+	require.NoError(t, err)
+	output, err = staticCall(common.HexToAddress(genesisNodes[0]["owner"].(string)), dualMasterAddress, bc.CurrentHeader(), bc, input, st)
+	require.NoError(t, err, string(output))
+	err = dualMasterAbi.Unpack(&valInfo, getLatestValidatorByIndex, output)
+	require.NoError(t, err)
+	println(fmt.Sprintf("------ Index:%v address:%v owner:%v stakes:%v", 3, valInfo.Node.Hex(), valInfo.Owner.Hex(), valInfo.Stakes.String()))
+	require.Equal(t, genesisNodes[2]["address"].(string), valInfo.Node.Hex())
+	require.Equal(t, genesisNodes[2]["owner"].(string), valInfo.Owner.Hex())
+}
+
+func testClaimDualReward(t *testing.T, dualMasterAbi abi.ABI, bc *blockchain.BlockChain, st *state.StateDB) {
+	claimedNode := common.HexToAddress(genesisNodes[0]["address"].(string))
+	blockHeight := uint64(1)
+	requestClaimReward := "requestClaimReward"
+
+	var (
+		input, output []byte
+		err error
+	)
+
+	nodeBalance := st.GetBalance(claimedNode)
+	println(fmt.Sprintf("---- claiming reward for node:%v blockHeight:%v", claimedNode.Hex(), blockHeight))
+	println(fmt.Sprintf("---- balance of node:%v before claiming is %v", claimedNode.Hex(), nodeBalance.String()))
+
+	input, err = dualMasterAbi.Pack(requestClaimReward, claimedNode, blockHeight)
+	require.NoError(t, err)
+	output, err = call(claimedNode, dualMasterAddress, bc.CurrentHeader(), bc, input, big.NewInt(0), st)
+	require.NoError(t, err, string(output))
+
+	input, err = dualMasterAbi.Pack(requestClaimReward, claimedNode, blockHeight)
+	require.NoError(t, err)
+	output, err = call(common.HexToAddress(genesisNodes[1]["owner"].(string)), dualMasterAddress, bc.CurrentHeader(), bc, input, big.NewInt(0), st)
+	require.NoError(t, err, string(output))
+
+	input, err = dualMasterAbi.Pack(requestClaimReward, claimedNode, blockHeight)
+	require.NoError(t, err)
+	output, err = call(common.HexToAddress(genesisNodes[2]["owner"].(string)), dualMasterAddress, bc.CurrentHeader(), bc, input, big.NewInt(0), st)
+	require.NoError(t, err, string(output))
+
+	nodeBalance = st.GetBalance(claimedNode)
+	println(fmt.Sprintf("---- balance of node:%v after claiming is %v", claimedNode.Hex(), nodeBalance.String()))
+}
+
+func setup(t *testing.T) (*blockchain.BlockChain, abi.ABI, abi.ABI, *state.StateDB) {
 	bc, err := setupBlockchain()
 	require.NoError(t, err)
 
 	bc.ConsensusInfo = pos.ConsensusInfo{
-		Master: pos.MasterSmartContract{
+		Master: &pos.MasterInfo{
 			Address: masterAddress,
 			ABI: MasterAbi,
+			Nodes: pos.Nodes{
+				ABI: NodeAbi,
+			},
+			Stakers: pos.Stakers{
+				ABI: StakerAbi,
+			},
 		},
-		Nodes: pos.Nodes{
-			ABI: NodeAbi,
-		},
-		Stakers: pos.Stakers{
-			ABI: StakerAbi,
+		DualMaster: &pos.DualMasterInfo{
+			ABI: DualMasterAbi,
+			BlockReward: blockReward,
 		},
 	}
 
@@ -676,14 +789,17 @@ func setup(t *testing.T) (*blockchain.BlockChain, abi.ABI, *state.StateDB) {
 	masterAbi, err := abi.JSON(strings.NewReader(MasterAbi))
 	require.NoError(t, err)
 
+	dualMasterAbi, err := abi.JSON(strings.NewReader(DualMasterAbi))
+	require.NoError(t, err)
+
 	st, err := bc.State()
 	require.NoError(t, err)
 
-	return bc, masterAbi, st
+	return bc, masterAbi, dualMasterAbi, st
 }
 
 func TestMaster(t *testing.T) {
-	bc, masterAbi, st := setup(t)
+	bc, masterAbi, dualMasterAbi, st := setup(t)
 	testCreateMaster(t, masterAbi, bc, st, uint64(10), uint64(4), uint64(50))
 	testDeployNodesAndStakes(t, bc, st, genesisNodes, true)
 	testGetTotalStakes(t, masterAbi, bc, st, minimumStakes)
@@ -743,10 +859,18 @@ func TestMaster(t *testing.T) {
 	testSetReward(t, masterAbi, common.HexToAddress(genesisNodes[0]["address"].(string)), 1, bc, st)
 
 	// test sending rejected request
+	println("test sending rejected request")
 	rejectedAddress := common.HexToAddress(genesisNodes[0]["address"].(string))
 	testRejectBlock(t, masterAbi, rejectedAddress, common.HexToAddress(genesisNodes[1]["owner"].(string)), -1, 1, bc, st)
 	testRejectBlock(t, masterAbi, rejectedAddress, common.HexToAddress(genesisNodes[2]["owner"].(string)), -1, 1, bc, st)
 	testRejectBlock(t, masterAbi, rejectedAddress, common.HexToAddress(normalNodes[0]["owner"].(string)), 0, 1, bc, st)
+
+	println("test deploy and collect dual validators")
+	testDeployDualMasterSmartContract(t, dualMasterAbi, bc, st, uint64(10), uint64(4), uint64(50))
+	testCollectDualValidators(t, dualMasterAbi, bc, st)
+
+	println("test claiming dual reward")
+	testClaimDualReward(t, dualMasterAbi, bc, st)
 }
 
 func TestNode(t *testing.T) {

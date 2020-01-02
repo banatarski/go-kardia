@@ -34,7 +34,6 @@ import (
 	message "github.com/kardiachain/go-kardia/ksml/proto"
 	"github.com/kardiachain/go-kardia/lib/common"
 	"github.com/kardiachain/go-kardia/lib/log"
-	"github.com/kardiachain/go-kardia/mainchain/tx_pool"
 	expr "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
 )
 
@@ -43,7 +42,7 @@ type Parser struct {
 	PublishEndpoint      string                                                                // endpoint that message will be published to, in case publish action is used
 	PublishFunction      func(endpoint string, topic string, msg dualMsg.TriggerMessage) error // function is used for publish message to client chain
 	Bc                   base.BaseBlockChain                                                   // kardia blockchain
-	TxPool               *tx_pool.TxPool                                                       // kardia tx pool is used when smc:trigger is called.
+	TxPool               base.TxPool                                                       // kardia tx pool is used when smc:trigger is called.
 	StateDb              *state.StateDB
 	SmartContractAddress *common.Address        // master smart contract
 	GlobalPatterns       []string               // globalPatterns is a list of actions that parser will read through
@@ -58,7 +57,7 @@ type Parser struct {
 }
 
 func NewParser(proxyName, publishedEndpoint string, publishFunction func(endpoint string, topic string, msg dualMsg.TriggerMessage) error,
-	bc base.BaseBlockChain, txPool *tx_pool.TxPool,
+	bc base.BaseBlockChain, txPool base.TxPool,
 	smartContractAddress *common.Address, globalPatterns []string, globalMessage *message.EventMessage, canTrigger bool) *Parser {
 	stateDb := txPool.State()
 	return &Parser{

@@ -19,15 +19,18 @@
 package service
 
 import (
+	"fmt"
 	"github.com/kardiachain/go-kardia/configs"
 	"github.com/kardiachain/go-kardia/consensus"
 	"github.com/kardiachain/go-kardia/dualchain/blockchain"
 	"github.com/kardiachain/go-kardia/dualchain/event_pool"
 	"github.com/kardiachain/go-kardia/kai/service"
 	serviceconst "github.com/kardiachain/go-kardia/kai/service/const"
-	cmn "github.com/kardiachain/go-kardia/lib/common"
+	"github.com/kardiachain/go-kardia/kvm"
+	"github.com/kardiachain/go-kardia/lib/common"
 	"github.com/kardiachain/go-kardia/lib/log"
 	"github.com/kardiachain/go-kardia/lib/p2p"
+	kai "github.com/kardiachain/go-kardia/mainchain"
 	"github.com/kardiachain/go-kardia/mainchain/genesis"
 	"github.com/kardiachain/go-kardia/node"
 	"github.com/kardiachain/go-kardia/rpc"
@@ -54,9 +57,11 @@ type DualService struct {
 	// Handlers
 	eventPool           *event_pool.Pool
 	protocolManager     *service.ProtocolManager
+
 	blockchain          *blockchain.DualBlockChain
 	csManager           *consensus.ConsensusManager
 	dualBlockOperations *blockchain.DualBlockOperations
+	maxPeers            int
 
 	networkID uint64
 }
@@ -95,23 +100,27 @@ func newDualService(ctx *node.ServiceContext, config *DualConfig) (*DualService,
 	if err != nil {
 		return nil, err
 	}
-
 	consensusConfig := configs.DefaultConsensusConfig()
-
 	dualService.eventPool = event_pool.NewPool(logger, config.DualEventPool, dualService.blockchain)
 
 	if consensusConfig.WaitForTxs() {
 		dualService.eventPool.EnableTxsAvailable()
 	}
 
+	// get kardia service from context, to get dual validators set
+	var kardiaService *kai.KardiaService
+	if err = ctx.Service(&kardiaService); err != nil {
+		return nil, err
+	}
+	if kardiaService == nil {
+		return nil, fmt.Errorf("cannot get kardia service")
+	}
+	dualService.blockchain.ConsensusInfo = kardiaService.BlockChain().ConsensusInfo
 	// Initialization for consensus.
 	block := dualService.blockchain.CurrentBlock()
 
-	logger.Info("DUAL Validators: ", "valIndex", ctx.Config.DualChainConfig.ValidatorIndexes, "height", block.Height())
-	var validatorSet *types.ValidatorSet
-	validatorSet, err = node.GetValidatorSet(dualService.blockchain, ctx.Config.DualChainConfig.ValidatorIndexes)
+	validatorSet, err := kvm.CollectDualValidatorSet(kardiaService.TxPool().GetBlockChain())
 	if err != nil {
-		logger.Error("Cannot get validator from indices", "indices", ctx.Config.DualChainConfig.ValidatorIndexes, "err", err)
 		return nil, err
 	}
 
@@ -121,15 +130,19 @@ func newDualService(ctx *node.ServiceContext, config *DualConfig) (*DualService,
 	}
 	state := consensus.LastestBlockState{
 		ChainID:                     "kaigroupcon",
-		LastBlockHeight:             cmn.NewBigUint64(block.Height()),
+		LastBlockHeight:             common.NewBigUint64(block.Height()),
 		LastBlockID:                 blockID,
 		LastBlockTime:               block.Time(),
 		Validators:                  validatorSet,
 		LastValidators:              validatorSet,
-		LastHeightValidatorsChanged: cmn.NewBigInt32(-1),
+		LastHeightValidatorsChanged: common.NewBigInt32(-1),
 		AppHash:                     dualService.blockchain.ReadAppHash(block.Height()),
+		IsDual:                      true,
 	}
 	dualService.dualBlockOperations = blockchain.NewDualBlockOperations(dualService.logger, dualService.blockchain, dualService.eventPool)
+	// set txPool to dualBlockOperation
+	dualService.dualBlockOperations.SetMainChainTxPool(kardiaService.TxPool())
+
 	consensusState := consensus.NewConsensusState(
 		dualService.logger,
 		consensusConfig,
@@ -138,23 +151,26 @@ func newDualService(ctx *node.ServiceContext, config *DualConfig) (*DualService,
 		dualService.eventPool,
 	)
 	dualService.csManager = consensus.NewConsensusManager(DualServiceName, consensusState)
+	dualService.eventPool = event_pool.NewPool(logger, config.DualEventPool, dualService.blockchain)
+
 	// Set private validator for consensus manager.
 	privValidator := types.NewPrivValidator(ctx.Config.NodeKey())
 	dualService.csManager.SetPrivValidator(privValidator)
 
 	if dualService.protocolManager, err = service.NewProtocolManager(
-		config.ProtocolName,
+		dualService.config.ProtocolName,
 		dualService.logger,
-		config.NetworkId,
-		config.ChainID,
+		dualService.config.NetworkId,
+		dualService.config.ChainID,
 		dualService.blockchain,
 		dualService.chainConfig,
 		nil,
 		dualService.csManager); err != nil {
-		return nil, err
-	}
+			return nil, err
+		}
 	//namdoh@ dualService.protocolManager.acceptTxs = config.AcceptTxs
 	dualService.csManager.SetProtocol(dualService.protocolManager)
+
 	return dualService, nil
 }
 
@@ -198,14 +214,11 @@ func (s *DualService) Protocols() []p2p.Protocol {
 // Kardia protocol implementation.
 func (s *DualService) Start(srvr *p2p.Server) error {
 	// Figures out a max peers count based on the server limits.
-	maxPeers := srvr.MaxPeers
-
+	s.maxPeers = srvr.MaxPeers
 	// Starts the networking layer.
-	s.protocolManager.Start(maxPeers)
-
+	s.protocolManager.Start(s.maxPeers)
 	// Start consensus manager.
 	s.csManager.Start()
-
 	return nil
 }
 

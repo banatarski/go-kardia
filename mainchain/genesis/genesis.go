@@ -181,7 +181,7 @@ func (g *Genesis) ToBlock(logger log.Logger, db kaidb.Database) *types.Block {
 		g.GasLimit = GenesisGasLimit
 	}
 	// init pos genesis here
-	if !statedb.Exist(g.ConsensusInfo.Master.Address) && g.ConsensusInfo.Master.Address.Hex() != (common.Address{}).Hex() {
+	if g.ConsensusInfo.Master != nil && !statedb.Exist(g.ConsensusInfo.Master.Address) && g.ConsensusInfo.Master.Address.Hex() != (common.Address{}).Hex() {
 		if err := kvm.InitGenesisConsensus(statedb, g.GasLimit, g.ConsensusInfo); err != nil {
 			panic(err)
 		}

@@ -21,6 +21,7 @@ package tx_pool
 import (
 	"errors"
 	"fmt"
+	"github.com/kardiachain/go-kardia/kai/base"
 	"math/big"
 	"sort"
 	"sync"
@@ -118,16 +119,6 @@ const (
 	TxStatusIncluded
 )
 
-// blockChain provides the state of blockchain and current gas limit to do
-// some pre checks in tx pool and event subscribers.
-type blockChain interface {
-	CurrentBlock() *types.Block
-	GetBlock(hash common.Hash, number uint64) *types.Block
-	StateAt(height uint64) (*state.StateDB, error)
-	DB() types.StoreDB
-	SubscribeChainHeadEvent(ch chan<- events.ChainHeadEvent) event.Subscription
-}
-
 // TxPoolConfig are the configuration parameters of the transaction pool.
 type TxPoolConfig struct {
 	Locals    []common.Address // Addresses that should be treated by default as local
@@ -218,7 +209,7 @@ func GetDefaultTxPoolConfig(path string) *TxPoolConfig {
 type TxPool struct {
 	config      TxPoolConfig
 	chainconfig *types.ChainConfig
-	chain       blockChain
+	chain       base.BaseBlockChain
 	gasPrice    *big.Int
 	txFeed      event.Feed
 	scope       event.SubscriptionScope
@@ -258,7 +249,7 @@ type txpoolResetRequest struct {
 
 // NewTxPool creates a new transaction pool to gather, sort and filter inbound
 // transactions from the network.
-func NewTxPool(config TxPoolConfig, chainconfig *types.ChainConfig, chain blockChain) *TxPool {
+func NewTxPool(config TxPoolConfig, chainconfig *types.ChainConfig, chain base.BaseBlockChain) *TxPool {
 	// Sanitize the input to ensure no vulnerable gas prices are set
 	config = (&config).sanitize()
 
@@ -336,7 +327,7 @@ func (pool *TxPool) State() *state.StateDB {
 	return pool.currentState
 }
 
-func (pool *TxPool) GetBlockChain() blockChain {
+func (pool *TxPool) GetBlockChain() base.BaseBlockChain {
 	return pool.chain
 }
 

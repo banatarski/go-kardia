@@ -49,6 +49,7 @@ type (
 		ZeroFee       uint           `yaml:"ZeroFee"`
 		IsDual        uint           `yaml:"IsDual"`
 		Consensus     *Consensus     `yaml:"Consensus,omitempty"`
+		DualConsensus *DualConsensus `yaml:"DualConsensus,omitempty"`
 		Genesis       *Genesis       `yaml:"Genesis,omitempty"`
 		TxPool        *Pool          `yaml:"TxPool,omitempty"`
 		EventPool     *Pool          `yaml:"EventPool,omitempty"`
@@ -75,6 +76,22 @@ type (
 		LockedPeriod               uint64            `yaml:"LockedPeriod"`  // LockedPeriod defines the period in block that user cannot withdraw staked KAI.
 		Compilation                Compilation       `yaml:"Compilation"`
 		Deployment                 Deployment        `yaml:"Deployment"`
+		DualGenesis                []DualGenesis     `yaml:"DualGenesis"` // DualGenesis defines all genesis dual master in order to make sure state of all chain remain the same.
+	}
+	DualGenesis struct {
+		Name                  string      `yaml:"Name"`
+		ByteCode              string      `yaml:"ByteCode"`
+		Address               string      `yaml:"Address"`
+		GenesisNodes           []string   `yaml:"GenesisNodes"` // genesis nodes are nodes act as validator from the beginning when there aren't any other registered nodes.
+	}
+	DualConsensus struct {
+		ABI          				string             `yaml:"ABI"`
+		DualMasterAddress           string             `yaml:"DualMasterAddress"` // dual master address. Note: the address must be registered and added in Master smart contract.
+		MaxViolatePercentageAllowed uint64             `yaml:"MaxViolatePercentageAllowed"`
+		FetchNewValidatorsTime      uint64             `yaml:"FetchNewValidatorsTime"`
+		MaxValidators               uint64             `yaml:"MaxValidators"`
+		ConsensusPeriodInBlock      uint64             `yaml:"ConsensusPeriod"`
+		BlockReward                 string             `yaml:"BlockReward"`
 	}
 	Compilation struct { // Compilation contains compiled bytecodes and abi for Master.sol, Node.sol and Staker.sol
 		Master     CompilationInfo  `yaml:"Master"`

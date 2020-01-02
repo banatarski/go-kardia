@@ -106,7 +106,7 @@ func ApplyTransaction(logger log.Logger, bc base.BaseBlockChain, gp *types.GasPo
 	// Apply the transaction to the current state (included in the env)
 	_, gas, failed, err := ApplyMessage(vmenv, msg, gp)
 	if err != nil {
-		return nil, 0, err
+		return nil, gas, err
 	}
 	// Update the state with pending changes
 	var root []byte
@@ -318,7 +318,7 @@ func (st *StateTransition) TransitionDb() (ret []byte, usedGas uint64, failed bo
 		ret, st.gas, vmerr = vm.Call(sender, st.to(), st.data, st.gas, st.value)
 	}
 	if vmerr != nil {
-		log.Error("VM returned with error", "err", vmerr)
+		log.Error("VM returned with error", "err", vmerr, "From", st.msg.From().Hex(), "To", st.msg.To().Hex(), "gas", st.msg.Gas())
 		// The only possible consensus-error would be if there wasn't
 		// sufficient balance to make the transfer happen. The first
 		// balance transfer may never fail.

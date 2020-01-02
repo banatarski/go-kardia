@@ -1504,6 +1504,7 @@ type LastestBlockState struct {
 
 	// The latest AppHash we've received from calling abci.Commit()
 	AppHash cmn.Hash
+	IsDual bool
 }
 
 // Copy makes a copy of the State for mutating.
@@ -1526,6 +1527,7 @@ func (state LastestBlockState) Copy() LastestBlockState {
 		LastHeightValidatorsChanged: state.LastHeightValidatorsChanged,
 
 		AppHash: state.AppHash,
+		IsDual: state.IsDual,
 
 		//namdoh@ LastResultsHash: state.LastResultsHash,
 	}
@@ -1551,9 +1553,12 @@ func (state *LastestBlockState) mayRefreshValidatorSet(bc base.BaseBlockChain) {
 	currentVals := state.Validators
 	nextVals := state.PrefetchedFutureValidators
 
-
+	fetchNewValidatorsTime := bc.GetFetchNewValidatorsTime()
+	if state.IsDual {
+		fetchNewValidatorsTime = bc.GetConsensusDualMasterSmartContract().FetchNewValidatorsTime
+	}
 	// if height is between currentVals's endHeight and EndHeight-bc.GetFetchNewValidatorsTime(), fetch new validators.
-	if nextVals == nil && height < currentVals.EndHeight && height >= currentVals.EndHeight-int64(bc.GetFetchNewValidatorsTime()) {
+	if nextVals == nil && height < currentVals.EndHeight && height >= currentVals.EndHeight-int64(fetchNewValidatorsTime) {
 		state.PrefetchedFutureValidators = state.fetchValidatorSet(bc)
 	}
 
@@ -1572,7 +1577,12 @@ func (state *LastestBlockState) fetchValidatorSet(bc base.BaseBlockChain) *types
 		valSet *types.ValidatorSet
 		err error
 	)
-	if valSet, err = kvm.CollectValidatorSet(bc); err != nil || valSet == nil {
+	if state.IsDual {
+		valSet, err = kvm.CollectDualValidatorSet(bc)
+	} else {
+		valSet, err = kvm.CollectMasterValidatorSet(bc)
+	}
+	if err != nil || valSet == nil {
 		log.Error("error while fetching validator set", "err", err)
 		return nil
 	}

@@ -71,6 +71,7 @@ type DualBlockChain struct {
 	futureBlocks *lru.Cache     // future blocks are blocks added for later processing
 
 	quit chan struct{} // blockchain quit channel
+	pos.ConsensusInfo
 }
 
 // Genesis retrieves the chain's genesis block.
@@ -474,19 +475,27 @@ func (dbc *DualBlockChain) ApplyMessage(vm base.KVM, msg types.Message, gp *type
 }
 
 func (dbc *DualBlockChain) GetBlockReward() *big.Int {
-	return nil
+	return dbc.Master.BlockReward
 }
 
-func (dbc *DualBlockChain) GetConsensusMasterSmartContract() pos.MasterSmartContract {
-	return pos.MasterSmartContract{}
+func (dbc *DualBlockChain) GetDualBlockReward() *big.Int {
+	return dbc.DualMaster.BlockReward
+}
+
+func (dbc *DualBlockChain) GetConsensusMasterSmartContract() *pos.MasterInfo {
+	return dbc.Master
 }
 
 func (dbc *DualBlockChain) GetConsensusNodeAbi() string {
-	return ""
+	return dbc.Master.Nodes.ABI
 }
 
 func (dbc *DualBlockChain) GetConsensusStakerAbi() string {
-	return ""
+	return dbc.Master.Stakers.ABI
 }
 
-func (dbc *DualBlockChain) GetFetchNewValidatorsTime() uint64 { return 0 }
+func (dbc *DualBlockChain) GetFetchNewValidatorsTime() uint64 { return dbc.DualMaster.FetchNewValidatorsTime }
+
+func (dbc *DualBlockChain) GetConsensusDualMasterSmartContract() *pos.DualMasterInfo {
+	return dbc.DualMaster
+}

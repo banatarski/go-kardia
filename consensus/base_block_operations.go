@@ -21,7 +21,6 @@ package consensus
 import (
 	"github.com/kardiachain/go-kardia/kai/base"
 	"github.com/kardiachain/go-kardia/lib/common"
-	"github.com/kardiachain/go-kardia/mainchain/tx_pool"
 	"github.com/kardiachain/go-kardia/types"
 )
 
@@ -37,5 +36,5 @@ type BaseBlockOperations interface {
 	LoadBlockPart(height uint64, index int) *types.Part
 	LoadBlockMeta(height uint64) *types.BlockMeta
 	Blockchain() base.BaseBlockChain
-	TxPool() *tx_pool.TxPool
+	TxPool() base.TxPool
 }

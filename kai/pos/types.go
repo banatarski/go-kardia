@@ -24,6 +24,15 @@ import (
 )
 
 type ConsensusInfo struct {
+	Master                      *MasterInfo
+	DualMaster                  *DualMasterInfo
+}
+
+type MasterInfo struct {
+	Address                     common.Address
+	ByteCode                    []byte
+	ABI                         string
+	GenesisAmount               *big.Int
 	MaxViolatePercentageAllowed uint64
 	FetchNewValidatorsTime      uint64
 	BlockReward                 *big.Int
@@ -31,16 +40,9 @@ type ConsensusInfo struct {
 	ConsensusPeriodInBlock      uint64
 	MinimumStakes               *big.Int
 	LockedPeriod                uint64
-	Master                      MasterSmartContract
 	Nodes                       Nodes
 	Stakers                     Stakers
-}
-
-type MasterSmartContract struct {
-	Address  common.Address
-	ByteCode []byte
-	ABI      string
-	GenesisAmount *big.Int
+	DualGenesis                 []DualGenesis
 }
 
 type Nodes struct {
@@ -49,10 +51,27 @@ type Nodes struct {
 	GenesisInfo     []GenesisNodeInfo
 }
 
+type DualGenesis struct {
+	Name string
+	ByteCode []byte
+	Address common.Address
+	GenesisNodes []string
+}
+
 type Stakers struct {
 	ABI         string
 	ByteCode    []byte
 	GenesisInfo []GenesisStakeInfo
+}
+
+type DualMasterInfo struct {
+	ABI                         string
+	Address                     common.Address
+	MaxViolatePercentageAllowed uint64
+	FetchNewValidatorsTime      uint64
+	BlockReward                 *big.Int
+	MaxValidators               uint64
+	ConsensusPeriodInBlock      uint64
 }
 
 type GenesisNodeInfo struct {

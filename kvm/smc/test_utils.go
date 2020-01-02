@@ -34,8 +34,9 @@ import (
 	"math/big"
 )
 
-const maximumGasUsed = uint64(7000000)
+const maximumGasUsed = uint64(8000000)
 var (
+	dualMasterAddress = common.HexToAddress("0x0000000000000000000000000000000000000030")
 	masterAddress = common.HexToAddress("0x0000000000000000000000000000000000000009")
 	genesisNodes = []map[string]interface{}{
 		{
@@ -44,7 +45,7 @@ var (
 			"name": "node1",
 			"host": "127.0.0.1",
 			"port": "3000",
-			"percentageReward": uint16(500),
+			"percentageReward": uint16(5),
 			"owner": "0xc1fe56E3F58D3244F606306611a5d10c8333f1f6",
 			"staker": "0x0000000000000000000000000000000000000020",
 			"expectedStakes": minimumStakes,
@@ -56,7 +57,7 @@ var (
 			"name": "node2",
 			"host": "127.0.0.1",
 			"port": "3001",
-			"percentageReward": uint16(500),
+			"percentageReward": uint16(5),
 			"owner": "0x7cefC13B6E2aedEeDFB7Cb6c32457240746BAEe5",
 			"staker": "0x0000000000000000000000000000000000000021",
 			"expectedStakes": minimumStakes,
@@ -68,7 +69,7 @@ var (
 			"name": "node3",
 			"host": "127.0.0.1",
 			"port": "3002",
-			"percentageReward": uint16(500),
+			"percentageReward": uint16(5),
 			"owner": "0xfF3dac4f04dDbD24dE5D6039F90596F0a8bb08fd",
 			"staker": "0x0000000000000000000000000000000000000022",
 			"expectedStakes": minimumStakes,
@@ -83,7 +84,7 @@ var (
 			"name": "node4",
 			"host": "127.0.0.1",
 			"port": "3003",
-			"percentageReward": uint16(500),
+			"percentageReward": uint16(5),
 			"owner": "0x071E8F5ddddd9f2D4B4Bdf8Fc970DFe8d9871c28",
 			"staker": "0x0000000000000000000000000000000000000023",
 			"expectedStakes": minimumStakes,
@@ -95,7 +96,7 @@ var (
 			"name": "node5",
 			"host": "127.0.0.1",
 			"port": "3004",
-			"percentageReward": uint16(500),
+			"percentageReward": uint16(5),
 			"owner": "0x94FD535AAB6C01302147Be7819D07817647f7B63",
 			"staker": "0x0000000000000000000000000000000000000024",
 			"expectedStakes": minimumStakes,
@@ -107,7 +108,7 @@ var (
 			"name": "node6",
 			"host": "127.0.0.1",
 			"port": "3005",
-			"percentageReward": uint16(500),
+			"percentageReward": uint16(5),
 			"owner": "0xa8073C95521a6Db54f4b5ca31a04773B093e9274",
 			"staker": "0x0000000000000000000000000000000000000025",
 			"expectedStakes": minimumStakes,
@@ -117,6 +118,7 @@ var (
 
 	minimumStakes, _ = big.NewInt(0).SetString("2000000000000000000000000", 10)
 	genesisAmount, _ = big.NewInt(0).SetString("1000000000000000000000000000", 10)
+	blockReward, _ = big.NewInt(0).SetString("100000000000000", 10)
 )
 
 // staticCall calls smc and return result in bytes format
@@ -136,10 +138,7 @@ func call(from common.Address, to common.Address, currentHeader *types.Header, c
 	vmenv := kvm.NewKVM(ctx, statedb, kvm.Config{})
 	sender := kvm.AccountRef(from)
 	ret, _, err := vmenv.Call(sender, to, input, maximumGasUsed, value)
-	if err != nil {
-		return make([]byte, 0), err
-	}
-	return ret, nil
+	return ret, err
 }
 
 func create(from common.Address, to common.Address, currentHeader *types.Header, chain base.BaseBlockChain, input []byte, value *big.Int, statedb *state.StateDB) (result []byte, address *common.Address, leftOverGas uint64, err error) {

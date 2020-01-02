@@ -27,6 +27,8 @@ contract Master {
     string constant methodUpdateBlock = "updateBlock(uint64,bool)";
     string constant methodIsViolatedNode = "isViolatedNode(address,uint64)";
     string constant getOwner = "getOwner()";
+    string constant updateStakeAmount = "updateStakeAmount(address,uint256)";
+    string constant joinDualFunc = "join(address,address,uint256)";
     address constant PoSHandler = 0x0000000000000000000000000000000000000005;
 
     address[] _genesisNodes = [
@@ -47,13 +49,19 @@ contract Master {
     0x0000000000000000000000000000000000000022
     ];
 
+    address[] _availableDualNodes = [
+    0x0000000000000000000000000000000000000000,
+    0x0000000000000000000000000000000000000030,
+    0x0000000000000000000000000000000000000040,
+    0x0000000000000000000000000000000000000050
+    ];
+
+
     mapping(address=>bool) _isGenesis;
     mapping(address=>bool) _isGenesisOwner;
 
     modifier isGenesis {
-        require(
-            _isGenesis[msg.sender] || _isGenesisOwner[msg.sender], "user does not have genesis permission"
-        );
+        require(isMasterGenesis(msg.sender), "user does not have genesis permission");
         _;
     }
 
@@ -63,11 +71,7 @@ contract Master {
     }
 
     modifier _isValidatorOrGenesis {
-        bool result = _isGenesisOwner[msg.sender] || _isGenesis[msg.sender];
-        if (!result) {
-            result = isValidator(msg.sender);
-        }
-        require(result, "sender is neither validator and genesis");
+        require(isMasterGenesis(msg.sender) || isValidator(msg.sender), "sender is neither validator and genesis");
         _;
     }
 
@@ -91,6 +95,7 @@ contract Master {
         address owner;
         uint256 stakes;
         uint64 totalStaker;
+        uint64 dualIndex; // if a node is dual node its index is greater than 0.
     }
 
     struct NodeIndex {
@@ -173,7 +178,7 @@ contract Master {
         _maxValidators = maxValidators;
         _maxViolatePercentage = maxViolatePercentage;
 
-        _availableNodes.push(NodeInfo(address(0x0), address(0x0), 0, 0));
+        _availableNodes.push(NodeInfo(address(0x0), address(0x0), 0, 0, 0));
         _pendingNodes.push(PendingInfo(_availableNodes[0], 0, true));
         _pendingDeletedNodes.push(PendingDeleteInfo(_availableNodes[0], 0, 0, true));
 
@@ -183,7 +188,7 @@ contract Master {
             _isGenesisOwner[_genesisOwners[i]] = true;
             _ownerNode[_genesisOwners[i]] = genesisAddress;
 
-            _availableNodes.push(NodeInfo(genesisAddress, _genesisOwners[i], 0, 1));
+            _availableNodes.push(NodeInfo(genesisAddress, _genesisOwners[i], 0, 1, 0));
             _availableAdded[genesisAddress] = i+1;
             _nodeIndex[genesisAddress].stakerInfo[0] = StakerInfo(address(0x0), 0);
         }
@@ -199,7 +204,7 @@ contract Master {
     function addPendingNode(address nodeAddress) public _isAvailableNodes {
         if (_pendingAdded[nodeAddress] == 0) {
             address owner = getAddressOwner(nodeAddress);
-            _pendingNodes.push(PendingInfo(NodeInfo(nodeAddress, owner, 0, 1), 1, false));
+            _pendingNodes.push(PendingInfo(NodeInfo(nodeAddress, owner, 0, 1, 0), 1, false));
             _pendingNodes[_pendingNodes.length-1].votedAddress[msg.sender] = true;
             _pendingAdded[nodeAddress] = _pendingNodes.length-1;
         }
@@ -222,14 +227,19 @@ contract Master {
         return _pendingDeletedNodes.length - 1;
     }
 
-    function getAvailableNode(uint index) public view returns (address nodeAddress, address owner, uint256 stakes, uint64 totalStaker) {
+    function getAvailableNodeInfo(address node) public view returns (address nodeAddress, address owner, uint64 dualIndex, uint256 stakes, uint64 totalStaker) {
+        uint index = getAvailableNodeIndex(node);
+        return getAvailableNode(index);
+    }
+
+    function getAvailableNode(uint index) public view returns (address nodeAddress, address owner, uint64 dualIndex, uint256 stakes, uint64 totalStaker) {
         require(index > 0 && index < _availableNodes.length, "getAvailableNode:invalid index");
         NodeInfo storage info = _availableNodes[index];
-        return (info.node, info.owner, info.stakes, info.totalStaker);
+        return (info.node, info.owner, info.dualIndex, info.stakes, info.totalStaker);
     }
 
     function getStakerInfo(address node, uint64 index) public view returns (address staker, uint256 amount) {
-        (,,,uint64 totalStaker) = getAvailableNode(_availableAdded[node]);
+        (,,,,uint64 totalStaker) = getAvailableNode(_availableAdded[node]);
         require(index > 0 && index < totalStaker, "getStakerInfo:invalid index");
         return (_nodeIndex[node].stakerInfo[index].staker, _nodeIndex[node].stakerInfo[index].amount);
     }
@@ -401,6 +411,9 @@ contract Master {
                 _availableNodes[index] = temp;
                 index -= 1;
             }
+
+            // update stake amount in dual Master
+            updateDualStakeAmount(index);
         }
     }
 
@@ -430,7 +443,17 @@ contract Master {
             _availableNodes[index] = temp;
             index++;
         }
+        // update stake amount in dual Master
+        updateDualStakeAmount(index);
+    }
 
+    // updateDualStakeAmount updates stake amount in dual address for a specific node, after a staker stakes/withdraws KAI into/from it.
+    function updateDualStakeAmount(uint index) internal {
+        if (_availableNodes[index].dualIndex > 0) {
+            address dualMaster = _availableDualNodes[_availableNodes[index].dualIndex];
+            (bool success, ) = dualMaster.call(abi.encodeWithSignature(updateStakeAmount, _availableNodes[index].node, _availableNodes[index].stakes));
+            require(success == true, "update stake amount fail");
+        }
     }
 
     // collectValidators base on available nodes, max validators, collect validators and start new consensus period.
@@ -559,5 +582,30 @@ contract Master {
 
     function getNodeAddressFromOwner(address owner) public view returns (address node) {
         return _ownerNode[owner];
+    }
+
+    function isMasterGenesis(address sender) public view returns (bool) {
+        return _isGenesis[sender] || _isGenesisOwner[sender];
+    }
+
+    function dualAddressIndex(address dualAddress) public view returns (uint64) {
+        for (uint64 i=1; i < _availableDualNodes.length; i++) {
+            if (_availableDualNodes[i] == dualAddress) {
+                return i;
+            }
+        }
+        return 0;
+    }
+
+    function joinDualNode(address dualAddress) public _isAvailableNodes {
+        uint index = isAvailableNodes(msg.sender);
+        uint64 dualIndex = dualAddressIndex(dualAddress);
+
+        require(_availableNodes[index].dualIndex == 0 && dualIndex > 0, "this node has already joined another node");
+        (bool success,) = dualAddress.call(abi.encodeWithSignature(joinDualFunc, _availableNodes[index].node, _availableNodes[index].owner, _availableNodes[index].stakes));
+        require(success, "join dual address fail");
+
+        // update dualIndex to node info
+        _availableNodes[index].dualIndex = dualIndex;
     }
 }

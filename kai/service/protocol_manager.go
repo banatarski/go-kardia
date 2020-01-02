@@ -33,7 +33,6 @@ import (
 	"github.com/kardiachain/go-kardia/lib/log"
 	"github.com/kardiachain/go-kardia/lib/p2p"
 	"github.com/kardiachain/go-kardia/lib/p2p/discover"
-	"github.com/kardiachain/go-kardia/mainchain/tx_pool"
 	"github.com/kardiachain/go-kardia/types"
 )
 
@@ -74,7 +73,7 @@ type ProtocolManager struct {
 
 	peers *peerSet
 
-	txpool *tx_pool.TxPool
+	txpool base.TxPool
 
 	blockchain  base.BaseBlockChain
 	chainconfig *types.ChainConfig
@@ -111,7 +110,7 @@ func NewProtocolManager(
 	chainID uint64,
 	blockchain base.BaseBlockChain,
 	config *types.ChainConfig,
-	txpool *tx_pool.TxPool,
+	txpool base.TxPool,
 	csReactor *consensus.ConsensusManager) (*ProtocolManager, error) {
 
 	// Create the protocol manager with the base fields
@@ -167,6 +166,10 @@ func NewProtocolManager(
 	}
 
 	return manager, nil
+}
+
+func (pm *ProtocolManager) SetCsReactor(csReactor *consensus.ConsensusManager) {
+	pm.csReactor = csReactor
 }
 
 func (pm *ProtocolManager) removeServicePeer(id string) {

@@ -450,21 +450,29 @@ func (bc *BlockChain)ApplyMessage(vm base.KVM, msg types.Message, gp *types.GasP
 }
 
 func (bc *BlockChain) GetBlockReward() *big.Int {
-	return bc.BlockReward
+	return bc.ConsensusInfo.Master.BlockReward
 }
 
-func (bc *BlockChain) GetConsensusMasterSmartContract() pos.MasterSmartContract {
+func (bc *BlockChain) GetDualBlockReward() *big.Int {
+	return bc.ConsensusInfo.DualMaster.BlockReward
+}
+
+func (bc *BlockChain) GetConsensusMasterSmartContract() *pos.MasterInfo {
 	return bc.ConsensusInfo.Master
 }
 
 func (bc *BlockChain) GetConsensusNodeAbi() string {
-	return bc.ConsensusInfo.Nodes.ABI
+	return bc.ConsensusInfo.Master.Nodes.ABI
 }
 
 func (bc *BlockChain) GetConsensusStakerAbi() string {
-	return bc.ConsensusInfo.Stakers.ABI
+	return bc.ConsensusInfo.Master.Stakers.ABI
 }
 
 func (bc *BlockChain) GetFetchNewValidatorsTime() uint64 {
-	return bc.ConsensusInfo.FetchNewValidatorsTime
+	return bc.ConsensusInfo.Master.FetchNewValidatorsTime
+}
+
+func (bc *BlockChain) GetConsensusDualMasterSmartContract() *pos.DualMasterInfo {
+	return bc.ConsensusInfo.DualMaster
 }

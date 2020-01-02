@@ -27,7 +27,6 @@ import (
 	"github.com/kardiachain/go-kardia/lib/common"
 	"github.com/kardiachain/go-kardia/lib/crypto"
 	"github.com/kardiachain/go-kardia/lib/log"
-	"github.com/kardiachain/go-kardia/mainchain/tx_pool"
 	"github.com/kardiachain/go-kardia/types"
 	"math"
 	"math/big"
@@ -35,7 +34,7 @@ import (
 )
 
 // ClaimReward is used to create claimReward transaction
-func ClaimReward(height uint64, bc base.BaseBlockChain, state *state.StateDB, txPool *tx_pool.TxPool) (*types.Transaction, error) {
+func ClaimReward(height uint64, bc base.BaseBlockChain, state *state.StateDB, txPool base.TxPool) (*types.Transaction, error) {
 	var (
 		posAbi, masterAbi abi.ABI
 		err error
@@ -71,11 +70,54 @@ func ClaimReward(height uint64, bc base.BaseBlockChain, state *state.StateDB, tx
 	if input, err = posAbi.Pack(methodClaimReward, nodeAddress.Node, height); err != nil {
 		return nil, err
 	}
-	return generateTransaction(txPool.Nonce(sender), input, &privateKey)
+	return generateTransaction(vm, txPool.Nonce(sender), input, &privateKey, posHandlerAddress)
+}
+
+func RequestClaimDualReward(height uint64, validator, dualMasterAddress common.Address, bc base.BaseBlockChain, state *state.StateDB, txPool base.TxPool) error {
+	var (
+		dualMasterAbi, masterAbi abi.ABI
+		err error
+		input, output []byte
+		nodeAddress nodeAddressFromOwner
+		tx *types.Transaction
+	)
+	sender := bc.Config().BaseAccount.Address
+	privateKey := bc.Config().BaseAccount.PrivateKey
+	vm := newInternalKVM(sender, bc, state)
+
+	if dualMasterAbi, err = abi.JSON(strings.NewReader(bc.GetConsensusDualMasterSmartContract().ABI)); err != nil {
+		log.Error("fail to init posAbi", "err", err)
+		return err
+	}
+	masterSmartContract := bc.GetConsensusMasterSmartContract()
+	if masterAbi, err = abi.JSON(strings.NewReader(masterSmartContract.ABI)); err != nil {
+		log.Error("fail to init masterAbi", "err", err)
+		return err
+	}
+	// get node from sender
+	if input, err = masterAbi.Pack(methodGetNodeAddressFromOwner, validator); err != nil {
+		return err
+	}
+	if output, err = StaticCall(vm, masterSmartContract.Address, input); err != nil {
+		log.Error("fail to get node from sender", "err", err)
+		return err
+	}
+	if err = masterAbi.Unpack(&nodeAddress, methodGetNodeAddressFromOwner, output); err != nil {
+		log.Error("fail to unpack output to nodeAddress", "err", err, "output", common.Bytes2Hex(output))
+		return err
+	}
+	// create claimReward transaction
+	if input, err = dualMasterAbi.Pack(methodRequestClaimReward, nodeAddress.Node, height); err != nil {
+		return err
+	}
+	if tx, err = generateTransaction(vm, txPool.Nonce(sender), input, &privateKey, dualMasterAddress); err != nil {
+		return err
+	}
+	return txPool.AddLocal(tx)
 }
 
 // NewConsensusPeriod is created by proposer.
-func NewConsensusPeriod(height uint64, bc base.BaseBlockChain, state *state.StateDB, txPool *tx_pool.TxPool) (*types.Transaction, error) {
+func NewConsensusPeriod(height uint64, bc base.BaseBlockChain, state *state.StateDB, txPool base.TxPool) (*types.Transaction, error) {
 	var (
 		input, output []byte
 		posAbi, masterAbi abi.ABI
@@ -99,7 +141,7 @@ func NewConsensusPeriod(height uint64, bc base.BaseBlockChain, state *state.Stat
 		return nil, err
 	}
 	// height must behind EndAtBlock bc.GetFetchNewValidators() blocks.
-	if vals.EndAtBlock != height+bc.GetFetchNewValidatorsTime() {
+	if vals.EndAtBlock >= height+bc.GetFetchNewValidatorsTime() {
 		return nil, nil
 	}
 	if posAbi, err = abi.JSON(strings.NewReader(PosHandlerAbi)); err != nil {
@@ -108,20 +150,83 @@ func NewConsensusPeriod(height uint64, bc base.BaseBlockChain, state *state.Stat
 	if input, err = posAbi.Pack(methodNewConsensusPeriod, height); err != nil {
 		return nil, err
 	}
-	return generateTransaction(txPool.Nonce(sender), input, &privateKey)
+	return generateTransaction(vm, txPool.Nonce(sender), input, &privateKey, posHandlerAddress)
 }
 
-// CollectValidatorSet collects new validators list based on current available nodes and start new consensus period
-func CollectValidatorSet(bc base.BaseBlockChain) (*types.ValidatorSet, error) {
+func RequestNewDualConsensusPeriod(height, fetchNewValidatorsTime uint64, bc base.BaseBlockChain, state *state.StateDB, txPool base.TxPool) error {
+	var (
+		input, output []byte
+		dualMasterAbi, masterAbi abi.ABI
+		err error
+		vals validatorsInfo
+		tx *types.Transaction
+	)
+	sender := bc.Config().BaseAccount.Address
+	privateKey := bc.Config().BaseAccount.PrivateKey
+	vm := newInternalKVM(sender, bc, state)
+
+	if masterAbi, err = abi.JSON(strings.NewReader(bc.GetConsensusDualMasterSmartContract().ABI)); err != nil {
+		return err
+	}
+	if input, err = masterAbi.Pack(methodGetLatestValidatorsInfo); err != nil {
+		return err
+	}
+	if output, err = StaticCall(vm, bc.GetConsensusDualMasterSmartContract().Address, input); err != nil {
+		return err
+	}
+	if err = masterAbi.Unpack(&vals, methodGetLatestValidatorsInfo, output); err != nil {
+		return err
+	}
+	// height must behind EndAtBlock bc.GetFetchNewValidators() blocks.
+	if vals.EndAtBlock >= height+fetchNewValidatorsTime {
+		return nil
+	}
+	if dualMasterAbi, err = abi.JSON(strings.NewReader(bc.GetConsensusDualMasterSmartContract().ABI)); err != nil {
+		log.Error("fail to init posAbi", "err", err)
+		return err
+	}
+	if input, err = dualMasterAbi.Pack(methodRequestCollectValidators); err != nil {
+		return err
+	}
+	if tx, err = generateTransaction(vm, txPool.Nonce(sender), input, &privateKey, bc.GetConsensusDualMasterSmartContract().Address); err != nil {
+		return err
+	}
+	return txPool.AddLocal(tx)
+}
+
+func CollectMasterValidatorSet(bc base.BaseBlockChain) (*types.ValidatorSet, error) {
+	masterAddress := bc.GetConsensusMasterSmartContract().Address
+	masterAbi, err := abi.JSON(strings.NewReader(bc.GetConsensusMasterSmartContract().ABI))
+	if err != nil {
+		return nil, err
+	}
+	return collectValidatorSet(bc, masterAddress, masterAbi, false)
+}
+
+func CollectDualValidatorSet(bc base.BaseBlockChain) (*types.ValidatorSet, error) {
+	masterAddress := bc.GetConsensusDualMasterSmartContract().Address
+	masterAbi, err := abi.JSON(strings.NewReader(bc.GetConsensusDualMasterSmartContract().ABI))
+	if err != nil {
+		return nil, err
+	}
+	return collectValidatorSet(bc, masterAddress, masterAbi, true)
+}
+
+// collectValidatorSet collects new validators list based on current available nodes and start new consensus period
+func collectValidatorSet(bc base.BaseBlockChain, masterAddress common.Address, masterAbi abi.ABI, isDual bool) (*types.ValidatorSet, error) {
 	var (
 		err error
 		n nodeInfo
+		nodeAddress common.Address
+		stakes int64
 		input, output []byte
-		masterAbi, nodeAbi abi.ABI
+		nodeAbi abi.ABI
 		length, startBlock, endBlock uint64
 		pubKey *ecdsa.PublicKey
+		val validator
+		dualVal dualValidator
 	)
-	masterAddress := bc.GetConsensusMasterSmartContract().Address
+
 	st, err := bc.State()
 	if err != nil {
 		return nil, err
@@ -129,10 +234,6 @@ func CollectValidatorSet(bc base.BaseBlockChain) (*types.ValidatorSet, error) {
 	sender := bc.Config().BaseAccount.Address
 	ctx := NewInternalKVMContext(sender, bc.CurrentHeader(), bc)
 	vm := NewKVM(ctx, st, Config{})
-
-	if masterAbi, err = abi.JSON(strings.NewReader(bc.GetConsensusMasterSmartContract().ABI)); err != nil {
-		return nil, err
-	}
 	if nodeAbi, err = abi.JSON(strings.NewReader(bc.GetConsensusNodeAbi())); err != nil {
 		return nil, err
 	}
@@ -141,17 +242,25 @@ func CollectValidatorSet(bc base.BaseBlockChain) (*types.ValidatorSet, error) {
 	}
 	validators := make([]*types.Validator, 0)
 	for i:=uint64(1); i <= length; i++ {
-		var val validator
 		if input, err = masterAbi.Pack(methodGetLatestValidatorByIndex, i); err != nil {
 			return nil, err
 		}
 		if output, err = StaticCall(vm, masterAddress, input); err != nil {
 			return nil, err
 		}
-		if err = masterAbi.Unpack(&val, methodGetLatestValidatorByIndex, output); err != nil {
-			return nil, err
+		if !isDual {
+			if err = masterAbi.Unpack(&val, methodGetLatestValidatorByIndex, output); err != nil {
+				return nil, err
+			}
+			stakes = calculateVotingPower(val.Stakes)
+			nodeAddress = val.Node
+		} else {
+			if err = masterAbi.Unpack(&dualVal, methodGetLatestValidatorByIndex, output); err != nil {
+				return nil, err
+			}
+			stakes = calculateVotingPower(dualVal.Stakes)
+			nodeAddress = dualVal.Node
 		}
-		stakes := calculateVotingPower(val.Stakes)
 		if stakes < 0 {
 			return nil, fmt.Errorf("invalid stakes")
 		}
@@ -159,7 +268,7 @@ func CollectValidatorSet(bc base.BaseBlockChain) (*types.ValidatorSet, error) {
 		if input, err = nodeAbi.Pack(methodGetNodeInfo); err != nil {
 			return nil, err
 		}
-		if output, err = StaticCall(vm, val.Node, input); err != nil {
+		if output, err = StaticCall(vm, nodeAddress, input); err != nil {
 			return nil, err
 		}
 		if err = nodeAbi.Unpack(&n, methodGetNodeInfo, output); err != nil {
@@ -175,19 +284,18 @@ func CollectValidatorSet(bc base.BaseBlockChain) (*types.ValidatorSet, error) {
 
 // getLatestValidatorsInfo is used after collect validators process is done, node calls this function to get new validators set
 func getLatestValidatorsInfo(vm *KVM, masterAbi abi.ABI, masterAddress common.Address) (uint64, uint64, uint64, error) {
-	method := "getLatestValidatorsInfo"
 	var (
 		err error
 		input, output []byte
 		info latestValidatorsInfo
 	)
-	if input, err = masterAbi.Pack(method); err != nil {
+	if input, err = masterAbi.Pack(methodGetLatestValidatorsInfo); err != nil {
 		return 0, 0, 0, err
 	}
 	if output, err = StaticCall(vm, masterAddress, input); err != nil {
 		return 0, 0, 0, err
 	}
-	if err = masterAbi.Unpack(&info, method, output); err != nil {
+	if err = masterAbi.Unpack(&info, methodGetLatestValidatorsInfo, output); err != nil {
 		return 0, 0, 0, err
 	}
 	return info.TotalNodes, info.StartAtBlock, info.EndAtBlock, nil
@@ -198,12 +306,23 @@ func calculateVotingPower(amount *big.Int) int64 {
 	return amount.Div(amount, KAI).Int64()
 }
 
-func generateTransaction(nonce uint64, input []byte, privateKey *ecdsa.PrivateKey) (*types.Transaction, error) {
+func generateTransaction(vm *KVM, nonce uint64, input []byte, privateKey *ecdsa.PrivateKey, address common.Address) (*types.Transaction, error) {
+	var (
+		err error
+		gas uint64
+	)
+	if !address.Equal(posHandlerAddress) { // pos handler address requires 0 gas. For calling others smart contract, it's needed to estimate gas.
+		if gas, err = EstimateGas(vm, address, input); err != nil {
+			return nil, err
+		}
+	} else {
+		gas = calculateGas(input)
+	}
 	return types.SignTx(types.HomesteadSigner{}, types.NewTransaction(
 		nonce,
-		posHandlerAddress,
+		address,
 		big.NewInt(0),
-		calculateGas(input),
+		gas,
 		big.NewInt(0),
 		input,
 	), privateKey)
@@ -274,6 +393,43 @@ func rewardToNode(nodeAddress common.Address, blockHeight uint64, nodeReward *bi
 		return err
 	}
 	if _, err = InternalCall(vm, masterAddress, input, big.NewInt(0)); err != nil {
+		return err
+	}
+	// update nodeAddress balance
+	ctx.Transfer(state, masterAddress, nodeAddress, nodeReward)
+	addLog(vm, nodeAddress, nodeReward, blockHeight)
+	return nil
+}
+
+func rewardToDualNode(dualAddress, nodeAddress common.Address, blockHeight uint64, nodeReward *big.Int, ctx Context, state base.StateDB) error {
+	var (
+		dualAbi abi.ABI
+		err error
+		input, output []byte
+		isRewarded bool
+	)
+	masterAddress := ctx.Chain.GetConsensusMasterSmartContract().Address
+	vm := newInternalKVM(posHandlerAddress, ctx.Chain, state)
+	if dualAbi, err = abi.JSON(strings.NewReader(ctx.Chain.GetConsensusDualMasterSmartContract().ABI)); err != nil {
+		return err
+	}
+	// check if node has been rewarded in this blockHeight or not
+	if input, err = dualAbi.Pack(methodIsRewarded, blockHeight); err != nil {
+		return err
+	}
+	if output, err = StaticCall(vm, dualAddress, input); err != nil {
+		return err
+	}
+	if err = dualAbi.Unpack(&isRewarded, methodIsRewarded, output); err != nil {
+		return err
+	}
+	if isRewarded {
+		return fmt.Errorf(fmt.Sprintf("node:%v has been rewarded at block:%v", nodeAddress, blockHeight))
+	}
+	if input, err = dualAbi.Pack(methodSetRewarded, blockHeight); err != nil {
+		return err
+	}
+	if _, err = InternalCall(vm, dualAddress, input, big.NewInt(0)); err != nil {
 		return err
 	}
 	// update nodeAddress balance

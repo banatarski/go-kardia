@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"github.com/kardiachain/go-kardia/consensus"
 	"github.com/kardiachain/go-kardia/kai/base"
+	"github.com/kardiachain/go-kardia/mainchain/tx_pool"
 	"math/big"
 	"sync"
 	"time"
@@ -31,7 +32,6 @@ import (
 	"github.com/kardiachain/go-kardia/kvm"
 	"github.com/kardiachain/go-kardia/lib/common"
 	"github.com/kardiachain/go-kardia/lib/log"
-	"github.com/kardiachain/go-kardia/mainchain/tx_pool"
 	"github.com/kardiachain/go-kardia/types"
 )
 
@@ -44,12 +44,12 @@ type BlockOperations struct {
 	mtx sync.RWMutex
 
 	blockchain *BlockChain
-	txPool     *tx_pool.TxPool
+	txPool     base.TxPool
 	height     uint64
 }
 
 // NewBlockOperations returns a new BlockOperations with reference to the latest state of blockchain.
-func NewBlockOperations(logger log.Logger, blockchain *BlockChain, txPool *tx_pool.TxPool) *BlockOperations {
+func NewBlockOperations(logger log.Logger, blockchain *BlockChain, txPool base.TxPool) *BlockOperations {
 	return &BlockOperations{
 		logger:     logger,
 		blockchain: blockchain,
@@ -105,7 +105,11 @@ func (bo *BlockOperations) newConsensusPeriod(height uint64) error {
 	}
 	if tx != nil {
 		if err = bo.TxPool().AddLocal(tx); err != nil {
-			return err
+			if err != tx_pool.ErrReplaceUnderpriced {
+				return err
+			}
+			// retry
+			return bo.newConsensusPeriod(height)
 		}
 	}
 	return nil
@@ -128,7 +132,11 @@ func (bo *BlockOperations) claimReward(height uint64) error {
 		}
 		if err = bo.txPool.AddLocal(tx); err != nil {
 			bo.logger.Error("fail to add claim reward transaction", "err", err)
-			return err
+			if err != tx_pool.ErrReplaceUnderpriced {
+				return err
+			}
+			// retry
+			return bo.claimReward(height)
 		}
 	}
 	return nil
@@ -304,7 +312,7 @@ func (bo *BlockOperations) Blockchain() base.BaseBlockChain {
 	return bo.blockchain
 }
 
-func (bo *BlockOperations) TxPool() *tx_pool.TxPool {
+func (bo *BlockOperations) TxPool() base.TxPool {
 	return bo.txPool
 }
 
