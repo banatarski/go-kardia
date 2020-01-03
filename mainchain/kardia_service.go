@@ -20,7 +20,6 @@
 package kai
 
 import (
-	"github.com/kardiachain/go-kardia/configs"
 	"github.com/kardiachain/go-kardia/consensus"
 	"github.com/kardiachain/go-kardia/kai/base"
 	"github.com/kardiachain/go-kardia/kai/service"
@@ -114,7 +113,7 @@ func newKardiaService(ctx *node.ServiceContext, config *Config) (*KardiaService,
 		return nil, err
 	}
 
-	consensusConfig := configs.DefaultConsensusConfig()
+	consensusConfig := chainConfig.Kaicon
 
 	// Set zeroFee to blockchain
 	kai.blockchain.IsZeroFee = config.IsZeroFee

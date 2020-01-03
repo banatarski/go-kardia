@@ -22,15 +22,11 @@ import (
 	"crypto/ecdsa"
 	"encoding/hex"
 	"fmt"
-	"github.com/kardiachain/go-kardia/mainchain/permissioned"
 	"os"
 	"path/filepath"
-	"regexp"
-	"strconv"
 	"strings"
 
 	"github.com/kardiachain/go-kardia/dualchain/event_pool"
-	"github.com/kardiachain/go-kardia/kai/base"
 	"github.com/kardiachain/go-kardia/kai/kaidb/memorydb"
 	"github.com/kardiachain/go-kardia/kai/storage"
 	"github.com/kardiachain/go-kardia/kai/storage/kvstore"
@@ -267,12 +263,6 @@ func (c *NodeConfig) ResolvePath(path string) string {
 	return filepath.Join(c.instanceDir(), path)
 }
 
-// GetNodeIndex returns the index of node based on last digits in string
-func GetNodeIndex(nodeName string) (int, error) {
-	reg, _ := regexp.Compile("[0-9]+\\z")
-	return strconv.Atoi(reg.FindString(nodeName))
-}
-
 // NewNodeMetadata init new NodeMetadata
 func NewNodeMetadata(privateKey *string, publicKey *string, votingPower int64, listenAddr string) (*NodeMetadata, error) {
 
@@ -317,45 +307,3 @@ func (n *NodeMetadata) Coinbase() common.Address {
 	return crypto.PubkeyToAddress(n.PrivKey.PublicKey)
 }
 
-// GetNodeMetadataFromSmc gets nodes list from smartcontract
-func GetNodeMetadataFromSmc(bc *base.BaseBlockChain, valIndices []int) ([]NodeMetadata, error) {
-	util, err := permissioned.NewSmcPermissionUtil(*bc)
-	if err != nil {
-		return nil, err
-	}
-	nodes := make([]NodeMetadata, 0)
-	for _, idx := range valIndices {
-		// Get nodes by list of indices.
-		// Note: this is used for dev environement only.
-		pubString, _, listenAddr, votingPower, _, err := util.GetAdminNodeByIndex(int64(idx))
-		if err != nil {
-			return nil, err
-		}
-		n, err := NewNodeMetadata(nil, &pubString, votingPower.Int64(), listenAddr)
-		if err != nil {
-			return nil, err
-		}
-		nodes = append(nodes, *n)
-	}
-	return nodes, nil
-}
-
-// GetValidatorSet gets list of validators from permission smc defined in config and a list of indices.
-func GetValidatorSet(bc base.BaseBlockChain, valIndexes []int) (*types.ValidatorSet, error) {
-	nodes, err := GetNodeMetadataFromSmc(&bc, valIndexes)
-	if err != nil {
-		return nil, err
-	}
-	validators := make([]*types.Validator, 0)
-	for i := 0; i < len(valIndexes); i++ {
-		if valIndexes[i] < 0 {
-			return nil, fmt.Errorf("value of validator must be greater than 0")
-		}
-		node := nodes[i]
-		validators = append(validators, types.NewValidator(*node.PublicKey, node.VotingPower))
-	}
-	// TODO(huny@): Pass the start/end block height of the initial set of validator from the
-	// genesis here. Default to 0 and 100000000000 for now.
-	validatorSet := types.NewValidatorSet(validators, 0 /*start height*/, 100000000000 /*end height*/)
-	return validatorSet, nil
-}

@@ -19,13 +19,12 @@
 package mongodb
 
 import (
-	"math/big"
-
 	"github.com/kardiachain/go-kardia/lib/common"
 	"github.com/kardiachain/go-kardia/lib/crypto"
 	"github.com/kardiachain/go-kardia/lib/log"
 	"github.com/kardiachain/go-kardia/types"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"math/big"
 )
 
 const (
@@ -174,10 +173,21 @@ type (
 	}
 	ChainConfig struct {
 		Hash        string `json:"hash"     bson:"hash"`
-		Period      uint64 `json:"period"   bson:"period"`
-		Epoch       uint64 `json:"epoch"    bson:"epoch"`
+		TimeoutPropose             uint64            `json:"timeoutPropose"               bson:"timeoutPropose"`
+		TimeoutProposeDelta        uint64            `json:"timeoutProposeDelta"          bson:"timeoutProposeDelta"`
+		TimeoutPrevote             uint64            `json:"timeoutPrevote"               bson:"timeoutPrevote"`
+		TimeoutPrevoteDelta        uint64            `json:"timeoutPrevoteDelta"          bson:"timeoutPrevoteDelta"`
+		TimeoutPrecommit           uint64            `json:"timeoutPrecommit"             bson:"timeoutPrecommit"`
+		TimeoutPrecommitDelta      uint64            `json:"timeoutPrecommitDelta"        bson:"timeoutPrecommitDelta"`
+		TimeoutCommit              uint64            `json:"timeoutCommit"                bson:"timeoutCommit"`
+		SkipTimeoutCommit          bool              `json:"skipTimeoutCommit"            bson:"skipTimeoutCommit"`
+		CreateEmptyBlocks          bool              `json:"createEmptyBlocks"            bson:"createEmptyBlocks"`
+		CreateEmptyBlocksInterval  uint64            `json:"createEmptyBlocksInterval"    bson:"createEmptyBlocksInterval"`
+		PeerGossipSleepDuration    uint64            `json:"peerGossipSleepDuration"      bson:"peerGossipSleepDuration"`
+		PeerQueryMaj23SleepDuration uint64           `json:"peerQueryMaj23SleepDuration"  bson:"peerQueryMaj23SleepDuration"`
 		BaseAccount `json:"baseAccount,omitempty"`
 	}
+
 	Caching struct {
 		Key   string `json:"key"       bson:"key"`
 		Value string `json:"value"     bson:"value"`
@@ -486,8 +496,18 @@ func (commit *Commit) ToCommit() *types.Commit {
 func NewChainConfig(config *types.ChainConfig, hash common.Hash) *ChainConfig {
 	return &ChainConfig{
 		Hash:   hash.Hex(),
-		Epoch:  config.Kaicon.Epoch,
-		Period: config.Kaicon.Period,
+		TimeoutPropose: config.Kaicon.TimeoutPropose,
+		TimeoutProposeDelta: config.Kaicon.TimeoutProposeDelta,
+		TimeoutPrevote: config.Kaicon.TimeoutPrevote,
+		TimeoutPrevoteDelta: config.Kaicon.TimeoutPrevoteDelta,
+		TimeoutPrecommit: config.Kaicon.TimeoutPrecommit,
+		TimeoutPrecommitDelta: config.Kaicon.TimeoutPrecommitDelta,
+		TimeoutCommit: config.Kaicon.TimeoutCommit,
+		SkipTimeoutCommit: config.Kaicon.SkipTimeoutCommit,
+		CreateEmptyBlocks: config.Kaicon.CreateEmptyBlocks,
+		CreateEmptyBlocksInterval: config.Kaicon.CreateEmptyBlocksInterval,
+		PeerGossipSleepDuration: config.Kaicon.PeerGossipSleepDuration,
+		PeerQueryMaj23SleepDuration: config.Kaicon.PeerQueryMaj23SleepDuration,
 		BaseAccount: BaseAccount{
 			Address:    config.BaseAccount.Address.Hex(),
 			PrivateKey: common.Bytes2Hex(config.PrivateKey.D.Bytes()),
@@ -500,9 +520,19 @@ func (config *ChainConfig) ToChainConfig() *types.ChainConfig {
 	if err != nil {
 		return nil
 	}
-	kaiCon := types.KaiconConfig{
-		Epoch:  config.Epoch,
-		Period: config.Period,
+	kaiCon := types.ConsensusConfig{
+		TimeoutPropose:              config.TimeoutPropose,
+		TimeoutProposeDelta:         config.TimeoutProposeDelta,
+		TimeoutPrevote:              config.TimeoutPrevote,
+		TimeoutPrevoteDelta:         config.TimeoutPrevoteDelta,
+		TimeoutPrecommit:            config.TimeoutPrecommit,
+		TimeoutPrecommitDelta:       config.TimeoutPrecommitDelta,
+		TimeoutCommit:               config.TimeoutCommit,
+		SkipTimeoutCommit:           config.SkipTimeoutCommit,
+		CreateEmptyBlocks:           config.CreateEmptyBlocks,
+		CreateEmptyBlocksInterval:   config.CreateEmptyBlocksInterval,
+		PeerGossipSleepDuration:     config.PeerGossipSleepDuration,
+		PeerQueryMaj23SleepDuration: config.PeerQueryMaj23SleepDuration,
 	}
 	return &types.ChainConfig{Kaicon: &kaiCon, BaseAccount: &types.BaseAccount{PrivateKey: *pk, Address: common.HexToAddress(config.BaseAccount.Address)}}
 }

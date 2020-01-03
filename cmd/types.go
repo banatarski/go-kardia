@@ -39,6 +39,7 @@ type (
 		PrivateKey    string    `yaml:"PrivateKey"`
 		ListenAddress string    `yaml:"ListenAddress"`
 		MaxPeers      int       `yaml:"MaxPeers"`
+		Address       string    `yaml:"Address"`
 	}
 	Chain struct {
 		ServiceName   string         `yaml:"ServiceName"`
@@ -67,6 +68,12 @@ type (
 		Contracts      []Contract    `yaml:"Contracts"`
 	}
 	Consensus struct {
+		Configuration               ConsensusConfiguration `yaml:"Configuration"`
+		Compilation                Compilation       `yaml:"Compilation"`
+		Deployment                 Deployment        `yaml:"Deployment"`
+		DualGenesis                []DualGenesis     `yaml:"DualGenesis"` // DualGenesis defines all genesis dual master in order to make sure state of all chain remain the same.
+	}
+	ConsensusConfiguration struct {
 		MaxViolatePercentageAllowed uint64           `yaml:"MaxViolatePercentageAllowed"`
 		FetchNewValidatorsTime     uint64            `yaml:"FetchNewValidatorsTime"`
 		MaxValidators              uint64            `yaml:"MaxValidators"`
@@ -74,9 +81,18 @@ type (
 		BlockReward                string            `yaml:"BlockReward"`
 		MinimumStakes              string            `yaml:"MinimumStakes"` // MinimumStakes defines the minimum amount that a user stakes to a node.
 		LockedPeriod               uint64            `yaml:"LockedPeriod"`  // LockedPeriod defines the period in block that user cannot withdraw staked KAI.
-		Compilation                Compilation       `yaml:"Compilation"`
-		Deployment                 Deployment        `yaml:"Deployment"`
-		DualGenesis                []DualGenesis     `yaml:"DualGenesis"` // DualGenesis defines all genesis dual master in order to make sure state of all chain remain the same.
+		TimeoutPropose             uint64            `yaml:"TimeoutPropose"`
+		TimeoutProposeDelta        uint64            `yaml:"TimeoutProposeDelta"`
+		TimeoutPrevote             uint64            `yaml:"TimeoutPrevote"`
+		TimeoutPrevoteDelta        uint64            `yaml:"TimeoutPrevoteDelta"`
+		TimeoutPrecommit           uint64            `yaml:"TimeoutPrecommit"`
+		TimeoutPrecommitDelta      uint64            `yaml:"TimeoutPrecommitDelta"`
+		TimeoutCommit              uint64            `yaml:"TimeoutCommit"`
+		SkipTimeoutCommit          bool              `yaml:"SkipTimeoutCommit"`
+		CreateEmptyBlocks          bool              `yaml:"CreateEmptyBlocks"`
+		CreateEmptyBlocksInterval  uint64            `yaml:"CreateEmptyBlocksInterval"`
+		PeerGossipSleepDuration    uint64            `yaml:"PeerGossipSleepDuration"`
+		PeerQueryMaj23SleepDuration uint64           `yaml:"PeerQueryMaj23SleepDuration"`
 	}
 	DualGenesis struct {
 		Name                  string      `yaml:"Name"`
@@ -86,12 +102,8 @@ type (
 	}
 	DualConsensus struct {
 		ABI          				string             `yaml:"ABI"`
-		DualMasterAddress           string             `yaml:"DualMasterAddress"` // dual master address. Note: the address must be registered and added in Master smart contract.
-		MaxViolatePercentageAllowed uint64             `yaml:"MaxViolatePercentageAllowed"`
-		FetchNewValidatorsTime      uint64             `yaml:"FetchNewValidatorsTime"`
-		MaxValidators               uint64             `yaml:"MaxValidators"`
-		ConsensusPeriodInBlock      uint64             `yaml:"ConsensusPeriod"`
-		BlockReward                 string             `yaml:"BlockReward"`
+		MasterAddress               string             `yaml:"MasterAddress"` // dual master address. Note: the address must be registered and added in Master smart contract.
+		Configuration          ConsensusConfiguration  `yaml:"Configuration"`
 	}
 	Compilation struct { // Compilation contains compiled bytecodes and abi for Master.sol, Node.sol and Staker.sol
 		Master     CompilationInfo  `yaml:"Master"`

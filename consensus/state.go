@@ -34,7 +34,6 @@ import (
 
 	"github.com/ebuchman/fail-test"
 
-	cfg "github.com/kardiachain/go-kardia/configs"
 	cstypes "github.com/kardiachain/go-kardia/consensus/types"
 	cmn "github.com/kardiachain/go-kardia/lib/common"
 	"github.com/kardiachain/go-kardia/lib/log"
@@ -96,7 +95,7 @@ func EmptyTimeoutInfo() *timeoutInfo {
 type ConsensusState struct {
 	logger log.Logger
 
-	config          *cfg.ConsensusConfig
+	config          *types.ConsensusConfig
 	privValidator   *types.PrivValidator // for signing votes
 	blockOperations BaseBlockOperations
 	//evpool evidence.EvidencePool 	// TODO(namdoh): Add mem pool.
@@ -138,7 +137,7 @@ type ConsensusState struct {
 // NewConsensusState returns a new ConsensusState.
 func NewConsensusState(
 	logger log.Logger,
-	config *cfg.ConsensusConfig,
+	config *types.ConsensusConfig,
 	state LastestBlockState,
 	blockOperations BaseBlockOperations,
 	txNotifier txNotifier,
@@ -845,7 +844,7 @@ func (cs *ConsensusState) enterNewRound(height *cmn.BigInt, round *cmn.BigInt) {
 	waitForTxs := cs.config.WaitForTxs() && round.EqualsInt(0) && !cs.needProofBlock(height)
 	if waitForTxs {
 		if cs.config.CreateEmptyBlocksInterval > 0 {
-			cs.scheduleTimeout(cs.config.CreateEmptyBlocksInterval, height, round,
+			cs.scheduleTimeout(cs.config.GetCreateEmptyBlocksInterval(), height, round,
 				cstypes.RoundStepNewRound)
 		}
 	} else {

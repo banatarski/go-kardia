@@ -162,6 +162,36 @@ func setupGenesis(g *genesis.Genesis, db types.StoreDB) (*types.ChainConfig, com
 	})
 }
 
+func defaultConsensusConfig() *types.ConsensusConfig {
+	return &types.ConsensusConfig{
+		TimeoutPropose:              5000,
+		TimeoutProposeDelta:         500,
+		TimeoutPrevote:              1000,
+		TimeoutPrevoteDelta:         500,
+		TimeoutPrecommit:            1000,
+		TimeoutPrecommitDelta:       500,
+		TimeoutCommit:               1000,
+		SkipTimeoutCommit:           false,
+		CreateEmptyBlocks:           true,
+		CreateEmptyBlocksInterval:   3000,
+		PeerGossipSleepDuration:     100,
+		PeerQueryMaj23SleepDuration: 200,
+	}
+}
+
+// defaultTestnetFullGenesisBlock return turn the test network genesis block with both account and smc from configs
+func defaultTestnetFullGenesisBlock(accountData map[string]*big.Int, contractData map[string]string) *genesis.Genesis {
+	ga, err := genesis.GenesisAllocFromAccountAndContract(accountData, contractData)
+	if err != nil {
+		return nil
+	}
+	return &genesis.Genesis{
+		Config:   &types.ChainConfig{Kaicon:defaultConsensusConfig()},
+		GasLimit: 16777216,
+		Alloc:    ga,
+	}
+}
+
 func setupBlockchain() (*blockchain.BlockChain, error) {
 
 	var genesisAccounts = map[string]*big.Int{
@@ -173,7 +203,7 @@ func setupBlockchain() (*blockchain.BlockChain, error) {
 		"0xa8073C95521a6Db54f4b5ca31a04773B093e9274": genesisAmount,
 	}
 	kaiDb := kvstore.NewStoreDB(memorydb.New())
-	g := genesis.DefaulTestnetFullGenesisBlock(genesisAccounts, map[string]string{})
+	g := defaultTestnetFullGenesisBlock(genesisAccounts, map[string]string{})
 	chainConfig, _, genesisErr := setupGenesis(g, kaiDb)
 	if genesisErr != nil {
 		return nil, genesisErr

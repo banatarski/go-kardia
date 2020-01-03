@@ -20,7 +20,6 @@ package service
 
 import (
 	"fmt"
-	"github.com/kardiachain/go-kardia/configs"
 	"github.com/kardiachain/go-kardia/consensus"
 	"github.com/kardiachain/go-kardia/dualchain/blockchain"
 	"github.com/kardiachain/go-kardia/dualchain/event_pool"
@@ -100,7 +99,7 @@ func newDualService(ctx *node.ServiceContext, config *DualConfig) (*DualService,
 	if err != nil {
 		return nil, err
 	}
-	consensusConfig := configs.DefaultConsensusConfig()
+	consensusConfig := chainConfig.Kaicon
 	dualService.eventPool = event_pool.NewPool(logger, config.DualEventPool, dualService.blockchain)
 
 	if consensusConfig.WaitForTxs() {

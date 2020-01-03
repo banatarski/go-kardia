@@ -19,12 +19,12 @@
 package tests
 
 import (
+	"github.com/kardiachain/go-kardia/tool"
 	"math/big"
 	"testing"
 
 	"github.com/kardiachain/go-kardia/kai/storage/kvstore"
 
-	"github.com/kardiachain/go-kardia/configs"
 	"github.com/kardiachain/go-kardia/kai/account"
 	"github.com/kardiachain/go-kardia/kai/kaidb/memorydb"
 	"github.com/kardiachain/go-kardia/kai/state"
@@ -64,7 +64,7 @@ var (
 		"b34bd81838a4a335fb3403d0bf616eca1eb9a4b4716c7dda7c617503cfeaab67",
 		"e049a09c992c882bc2deb780323a247c6ee0951f8b4c5c1dd0fc2fc22ce6493d",
 	}
-	initBalance      = configs.InitValueInCell
+	initBalance      = tool.InitValueInCell
 	genesisContracts = map[string]string{
 		// Simple voting contract bytecode in genesis block, source code in kvm/smc/Ballot.sol
 		"0x00000000000000000000000000000000736D6332": "608060405260043610610057576000357c0100000000000000000000000000000000000000000000000000000000900463ffffffff168063124474a71461005c578063609ff1bd146100a0578063b3f98adc146100d1575b600080fd5b34801561006857600080fd5b5061008a600480360381019080803560ff169060200190929190505050610101565b6040518082815260200191505060405180910390f35b3480156100ac57600080fd5b506100b5610138565b604051808260ff1660ff16815260200191505060405180910390f35b3480156100dd57600080fd5b506100ff600480360381019080803560ff16906020019092919050505061019e565b005b600060048260ff161015156101195760009050610133565b60018260ff1660048110151561012b57fe5b016000015490505b919050565b6000806000809150600090505b60048160ff161015610199578160018260ff1660048110151561016457fe5b0160000154111561018c5760018160ff1660048110151561018157fe5b016000015491508092505b8080600101915050610145565b505090565b60008060003373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002090508060000160009054906101000a900460ff1680610201575060048260ff1610155b1561020b5761026a565b60018160000160006101000a81548160ff021916908315150217905550818160000160016101000a81548160ff021916908360ff1602179055506001808360ff1660048110151561025857fe5b01600001600082825401925050819055505b50505600a165627a7a72305820c93a970449b32fe53b59e0ed7cfeda5d52acafd2d1bdd3f2f67093f076acf1c60029",
@@ -99,6 +99,86 @@ func TestGenesisAllocFromData(t *testing.T) {
 	}
 }
 
+func DefaultConsensusConfig() *types.ConsensusConfig {
+	return &types.ConsensusConfig{
+		TimeoutPropose:              5000,
+		TimeoutProposeDelta:         500,
+		TimeoutPrevote:              1000,
+		TimeoutPrevoteDelta:         500,
+		TimeoutPrecommit:            1000,
+		TimeoutPrecommitDelta:       500,
+		TimeoutCommit:               1000,
+		SkipTimeoutCommit:           false,
+		CreateEmptyBlocks:           true,
+		CreateEmptyBlocksInterval:   3000,
+		PeerGossipSleepDuration:     100,
+		PeerQueryMaj23SleepDuration: 200,
+	}
+}
+
+// DefaultTestnetGenesisBlock returns the test network genesis block from configs.
+func DefaultTestnetGenesisBlock(allocData map[string]*big.Int) *genesis.Genesis {
+
+	ga, err := GenesisAllocFromData(allocData)
+	if err != nil {
+		return nil
+	}
+
+	return &genesis.Genesis{
+		Config:   &types.ChainConfig{
+			Kaicon:      DefaultConsensusConfig(),
+		},
+		GasLimit: 16777216,
+		Alloc:    ga,
+	}
+}
+
+// DefaultTestnetFullGenesisBlock return turn the test network genesis block with both account and smc from configs
+func DefaultTestnetFullGenesisBlock(accountData map[string]*big.Int, contractData map[string]string) *genesis.Genesis {
+	ga, err := genesis.GenesisAllocFromAccountAndContract(accountData, contractData)
+	if err != nil {
+		return nil
+	}
+	return &genesis.Genesis{
+		Config:   &types.ChainConfig{Kaicon:DefaultConsensusConfig()},
+		GasLimit: 16777216,
+		Alloc:    ga,
+	}
+}
+
+func GenesisAllocFromData(data map[string]*big.Int) (genesis.GenesisAlloc, error) {
+	ga := make(genesis.GenesisAlloc, len(data))
+
+	for address, balance := range data {
+		ga[common.HexToAddress(address)] = genesis.GenesisAccount{Balance: balance}
+	}
+
+	return ga, nil
+}
+
+func GenesisAllocFromContractData(data map[string]string) (genesis.GenesisAlloc, error) {
+	ga := make(genesis.GenesisAlloc, len(data))
+
+	for address, code := range data {
+		ga[common.HexToAddress(address)] = genesis.GenesisAccount{Code: common.Hex2Bytes(code), Balance: genesis.ToCell(100)}
+	}
+	return ga, nil
+}
+
+//same as DefaultTestnetGenesisBlock, but with smart contract data
+func DefaultTestnetGenesisBlockWithContract(allocData map[string]string) *genesis.Genesis {
+	ga, err := GenesisAllocFromContractData(allocData)
+	if err != nil {
+		return nil
+	}
+
+	return &genesis.Genesis{
+		Config:   &types.ChainConfig{Kaicon:DefaultConsensusConfig()},
+		GasLimit: 16777216,
+		Alloc:    ga,
+	}
+}
+
 func setupGenesis(g *genesis.Genesis, db types.StoreDB) (*types.ChainConfig, common.Hash, error) {
 	address := common.HexToAddress("0xc1fe56E3F58D3244F606306611a5d10c8333f1f6")
 	privateKey, _ := crypto.HexToECDSA("8843ebcb1021b00ae9a644db6617f9c6d870e5fd53624cefe374c1d2d710fd06")
@@ -116,7 +196,7 @@ func TestCreateGenesisBlock(t *testing.T) {
 	db := kvstore.NewStoreDB(memorydb.New())
 
 	// Create genesis block with state_processor_test.genesisAccounts
-	g := genesis.DefaultTestnetGenesisBlock(configs.GenesisAccounts)
+	g := DefaultTestnetGenesisBlock(tool.GenesisAccounts)
 	_, hash, err := setupGenesis(g, db)
 	if err != nil {
 		t.Error(err)
@@ -139,7 +219,7 @@ func TestCreateGenesisBlock(t *testing.T) {
 		t.Error(err)
 	} else {
 		// Get balance from addresses
-		for addr := range configs.GenesisAccounts {
+		for addr := range tool.GenesisAccounts {
 			b := s.GetBalance(common.HexToAddress(addr))
 			if b.Cmp(initBalance) != 0 {
 				t.Error("Balance does not match", "state balance", b, "balance", initBalance)
@@ -152,7 +232,7 @@ func TestCreateGenesisBlock(t *testing.T) {
 func TestCreateContractInGenesis(t *testing.T) {
 	db := kvstore.NewStoreDB(memorydb.New())
 	// Create genesis block with genesisContracts
-	g := genesis.DefaultTestnetGenesisBlockWithContract(genesisContracts)
+	g := DefaultTestnetGenesisBlockWithContract(genesisContracts)
 	_, hash, err := setupGenesis(g, db)
 	if err != nil {
 		t.Error(err)
@@ -189,7 +269,7 @@ func TestCreateContractInGenesis(t *testing.T) {
 func TestGenesisAllocFromAccountAndContract(t *testing.T) {
 	db := kvstore.NewStoreDB(memorydb.New())
 	// Create genesis block with state_processor_test.genesisAccounts
-	g := genesis.DefaulTestnetFullGenesisBlock(configs.GenesisAccounts, genesisContracts)
+	g := DefaultTestnetFullGenesisBlock(tool.GenesisAccounts, genesisContracts)
 	_, hash, err := setupGenesis(g, db)
 	if err != nil {
 		t.Error(err)
@@ -217,7 +297,7 @@ func TestGenesisAllocFromAccountAndContract(t *testing.T) {
 			}
 		}
 		// Get balance from addresses
-		for addr := range configs.GenesisAccounts {
+		for addr := range tool.GenesisAccounts {
 			b := s.GetBalance(common.HexToAddress(addr))
 			if b.Cmp(initBalance) != 0 {
 				t.Error("Balance does not match", "state balance", b, "init balance", initBalance)

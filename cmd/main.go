@@ -30,7 +30,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kardiachain/go-kardia/configs"
 	"github.com/kardiachain/go-kardia/dualchain/blockchain"
 	"github.com/kardiachain/go-kardia/dualchain/event_pool"
 	"github.com/kardiachain/go-kardia/dualchain/service"
@@ -146,11 +145,17 @@ func (c *Config) getTxPoolConfig() tx_pool.TxPoolConfig {
 
 // getGenesis gets genesis data from config
 func (c *Config) getGenesis(isDual bool) (*genesis.Genesis, error) {
-	var ga genesis.GenesisAlloc
-	var err error
+	var (
+		ga genesis.GenesisAlloc
+		err error
+		configuration ConsensusConfiguration
+	)
 	g := c.MainChain.Genesis
 	if isDual {
 		g = &Genesis{}
+		configuration = c.DualChain.DualConsensus.Configuration
+	} else {
+		configuration = c.MainChain.Consensus.Configuration
 	}
 	if g == nil {
 		ga = make(genesis.GenesisAlloc, 0)
@@ -171,8 +176,33 @@ func (c *Config) getGenesis(isDual bool) (*genesis.Genesis, error) {
 			return nil, err
 		}
 	}
+
+	privKey, err := crypto.HexToECDSA(c.P2P.PrivateKey)
+	if err != nil {
+		return nil, err
+	}
+
 	return &genesis.Genesis{
-		Config:   configs.TestnetChainConfig,
+		Config:   &types.ChainConfig{
+			BaseAccount: &types.BaseAccount{
+				Address:    common.HexToAddress(c.P2P.Address),
+				PrivateKey: *privKey,
+			},
+			Kaicon:      &types.ConsensusConfig{
+				TimeoutPropose:              configuration.TimeoutPropose,
+				TimeoutProposeDelta:         configuration.TimeoutProposeDelta,
+				TimeoutPrevote:              configuration.TimeoutPrevote,
+				TimeoutPrevoteDelta:         configuration.TimeoutPrevoteDelta,
+				TimeoutPrecommit:            configuration.TimeoutPrecommit,
+				TimeoutPrecommitDelta:       configuration.TimeoutPrecommitDelta,
+				TimeoutCommit:               configuration.TimeoutCommit,
+				SkipTimeoutCommit:           configuration.SkipTimeoutCommit,
+				CreateEmptyBlocks:           configuration.CreateEmptyBlocks,
+				CreateEmptyBlocksInterval:   configuration.CreateEmptyBlocksInterval,
+				PeerGossipSleepDuration:     configuration.PeerGossipSleepDuration,
+				PeerQueryMaj23SleepDuration: configuration.PeerQueryMaj23SleepDuration,
+			},
+		},
 		GasLimit: 16777216, // maximum number of uint24
 		Alloc:    ga,
 	}, nil
@@ -180,20 +210,20 @@ func (c *Config) getGenesis(isDual bool) (*genesis.Genesis, error) {
 
 func (c *Config) loadConsensusInfo() (*pos.ConsensusInfo, error) {
 	genesisAmount, _ := big.NewInt(0).SetString(c.MainChain.Consensus.Deployment.Master.GenesisAmount, 10)
-	minimumStakes, _ := big.NewInt(0).SetString(c.MainChain.Consensus.MinimumStakes, 10)
-	blockReward, _ := big.NewInt(0).SetString(c.MainChain.Consensus.BlockReward, 10)
+	minimumStakes, _ := big.NewInt(0).SetString(c.MainChain.Consensus.Configuration.MinimumStakes, 10)
+	blockReward, _ := big.NewInt(0).SetString(c.MainChain.Consensus.Configuration.BlockReward, 10)
 	masterInfo := pos.MasterInfo {
 		Address:                     common.HexToAddress(c.MainChain.Consensus.Deployment.Master.Address),
 		ByteCode:                    common.Hex2Bytes(c.MainChain.Consensus.Compilation.Master.ByteCode),
 		ABI:                         strings.Replace(c.MainChain.Consensus.Compilation.Master.ABI, "'", "\"", -1),
 		GenesisAmount:               genesis.ToCell(genesisAmount.Int64()),
-		MaxViolatePercentageAllowed: c.MainChain.Consensus.MaxViolatePercentageAllowed,
-		FetchNewValidatorsTime:      c.MainChain.Consensus.FetchNewValidatorsTime,
+		MaxViolatePercentageAllowed: c.MainChain.Consensus.Configuration.MaxViolatePercentageAllowed,
+		FetchNewValidatorsTime:      c.MainChain.Consensus.Configuration.FetchNewValidatorsTime,
 		BlockReward:                 blockReward,
-		MaxValidators:               c.MainChain.Consensus.MaxValidators,
-		ConsensusPeriodInBlock:      c.MainChain.Consensus.ConsensusPeriodInBlock,
+		MaxValidators:               c.MainChain.Consensus.Configuration.MaxValidators,
+		ConsensusPeriodInBlock:      c.MainChain.Consensus.Configuration.ConsensusPeriodInBlock,
 		MinimumStakes:               minimumStakes,
-		LockedPeriod:                c.MainChain.Consensus.LockedPeriod,
+		LockedPeriod:                c.MainChain.Consensus.Configuration.LockedPeriod,
 		Nodes: pos.Nodes{
 			ABI:         strings.Replace(c.MainChain.Consensus.Compilation.Node.ABI, "'", "\"", -1),
 			ByteCode:    common.Hex2Bytes(c.MainChain.Consensus.Compilation.Node.ByteCode),
@@ -242,15 +272,15 @@ func (c *Config) loadConsensusInfo() (*pos.ConsensusInfo, error) {
 	}
 	// add dual chain consensus if exists.
 	if c.DualChain != nil {
-		dualBlockReward, _ := big.NewInt(0).SetString(c.DualChain.DualConsensus.BlockReward, 10)
+		dualBlockReward, _ := big.NewInt(0).SetString(c.DualChain.DualConsensus.Configuration.BlockReward, 10)
 		consensus.DualMaster = &pos.DualMasterInfo{
 			ABI:                         strings.Replace(c.DualChain.DualConsensus.ABI, "'", "\"", -1),
-			Address:                     common.HexToAddress(c.DualChain.DualConsensus.DualMasterAddress),
-			MaxViolatePercentageAllowed: c.DualChain.DualConsensus.MaxViolatePercentageAllowed,
-			FetchNewValidatorsTime:      c.DualChain.DualConsensus.FetchNewValidatorsTime,
+			Address:                     common.HexToAddress(c.DualChain.DualConsensus.MasterAddress),
+			MaxViolatePercentageAllowed: c.DualChain.DualConsensus.Configuration.MaxViolatePercentageAllowed,
+			FetchNewValidatorsTime:      c.DualChain.DualConsensus.Configuration.FetchNewValidatorsTime,
 			BlockReward:                 dualBlockReward,
-			MaxValidators:               c.DualChain.DualConsensus.MaxValidators,
-			ConsensusPeriodInBlock:      c.DualChain.DualConsensus.ConsensusPeriodInBlock,
+			MaxValidators:               c.DualChain.DualConsensus.Configuration.MaxValidators,
+			ConsensusPeriodInBlock:      c.DualChain.DualConsensus.Configuration.ConsensusPeriodInBlock,
 		}
 	}
 	return &consensus, nil
@@ -382,16 +412,9 @@ func (c *Config) newLog() log.Logger {
 func (c *Config) getBaseAccount(isDual bool) (*types.BaseAccount, error) {
 	var privKey *ecdsa.PrivateKey
 	var err error
-	var address common.Address
 
-	if isDual {
-		address = common.HexToAddress(c.DualChain.BaseAccount.Address)
-		privKey, err = crypto.HexToECDSA(c.DualChain.BaseAccount.PrivateKey)
-	} else {
-		address = common.HexToAddress(c.MainChain.BaseAccount.Address)
-		privKey, err = crypto.HexToECDSA(c.MainChain.BaseAccount.PrivateKey)
-	}
-	if err != nil {
+	address := common.HexToAddress(c.P2P.Address)
+	if privKey, err = crypto.HexToECDSA(c.P2P.PrivateKey); err != nil {
 		return nil, fmt.Errorf("baseAccount: Invalid privatekey: %v", err)
 	}
 	return &types.BaseAccount{

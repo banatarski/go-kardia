@@ -37,7 +37,6 @@ import (
 	"github.com/rs/cors"
 	"gopkg.in/yaml.v2"
 
-	"github.com/kardiachain/go-kardia/configs"
 	"github.com/kardiachain/go-kardia/dualchain/blockchain"
 	"github.com/kardiachain/go-kardia/dualchain/event_pool"
 	"github.com/kardiachain/go-kardia/dualchain/service"
@@ -180,7 +179,22 @@ func (c *Config) getGenesis(isDual bool) (*genesis.Genesis, error) {
 		}
 	}
 	return &genesis.Genesis{
-		Config:   configs.TestnetChainConfig,
+		Config:   &types.ChainConfig{
+			Kaicon:      &types.ConsensusConfig{
+				TimeoutPropose:              5000,
+				TimeoutProposeDelta:         500,
+				TimeoutPrevote:              1000,
+				TimeoutPrevoteDelta:         500,
+				TimeoutPrecommit:            1000,
+				TimeoutPrecommitDelta:       500,
+				TimeoutCommit:               1000,
+				SkipTimeoutCommit:           false,
+				CreateEmptyBlocks:           true,
+				CreateEmptyBlocksInterval:   3000,
+				PeerGossipSleepDuration:     100,
+				PeerQueryMaj23SleepDuration: 200,
+			},
+		},
 		GasLimit: 16777216, // maximum number of uint24
 		Alloc:    ga,
 	}, nil

@@ -98,6 +98,36 @@ var (
 	address      = common.HexToAddress("0xc1fe56E3F58D3244F606306611a5d10c8333f1f6")
 )
 
+func defaultConsensusConfig() *types.ConsensusConfig {
+	return &types.ConsensusConfig{
+		TimeoutPropose:              5000,
+		TimeoutProposeDelta:         500,
+		TimeoutPrevote:              1000,
+		TimeoutPrevoteDelta:         500,
+		TimeoutPrecommit:            1000,
+		TimeoutPrecommitDelta:       500,
+		TimeoutCommit:               1000,
+		SkipTimeoutCommit:           false,
+		CreateEmptyBlocks:           true,
+		CreateEmptyBlocksInterval:   3000,
+		PeerGossipSleepDuration:     100,
+		PeerQueryMaj23SleepDuration: 200,
+	}
+}
+
+// defaultTestnetFullGenesisBlock return turn the test network genesis block with both account and smc from configs
+func defaultTestnetFullGenesisBlock(accountData map[string]*big.Int, contractData map[string]string) *genesis.Genesis {
+	ga, err := genesis.GenesisAllocFromAccountAndContract(accountData, contractData)
+	if err != nil {
+		return nil
+	}
+	return &genesis.Genesis{
+		Config:   &types.ChainConfig{Kaicon:defaultConsensusConfig()},
+		GasLimit: 16777216,
+		Alloc:    ga,
+	}
+}
+
 func execute(bc *blockchain.BlockChain, msg types.Message) ([]byte, error) {
 
 	// Get stateDb
@@ -176,7 +206,7 @@ func TestStateTransition_TransitionDb_noFee(t *testing.T) {
 
 	// Start setting up blockchain
 	kaiDb := kvstore.NewStoreDB(memorydb.New())
-	g := genesis.DefaulTestnetFullGenesisBlock(genesisAccounts, map[string]string{})
+	g := defaultTestnetFullGenesisBlock(genesisAccounts, map[string]string{})
 	address := common.HexToAddress("0xc1fe56E3F58D3244F606306611a5d10c8333f1f6")
 	privateKey, _ := crypto.HexToECDSA("8843ebcb1021b00ae9a644db6617f9c6d870e5fd53624cefe374c1d2d710fd06")
 
@@ -247,7 +277,7 @@ func TestStateTransition_TransitionDb_noFee(t *testing.T) {
 func TestStateTransition_TransitionDb_withFee(t *testing.T) {
 	// Start setting up blockchain
 	kaiDb := kvstore.NewStoreDB(memorydb.New())
-	g := genesis.DefaulTestnetFullGenesisBlock(genesisAccounts, map[string]string{})
+	g := defaultTestnetFullGenesisBlock(genesisAccounts, map[string]string{})
 	address := common.HexToAddress("0xc1fe56E3F58D3244F606306611a5d10c8333f1f6")
 	privateKey, _ := crypto.HexToECDSA("8843ebcb1021b00ae9a644db6617f9c6d870e5fd53624cefe374c1d2d710fd06")
 

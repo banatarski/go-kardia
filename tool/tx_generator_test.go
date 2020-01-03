@@ -21,7 +21,6 @@ package tool
 import (
 	"testing"
 
-	"github.com/kardiachain/go-kardia/configs"
 	"github.com/kardiachain/go-kardia/kai/kaidb/memorydb"
 	"github.com/kardiachain/go-kardia/kai/state"
 	"github.com/kardiachain/go-kardia/lib/common"
@@ -30,7 +29,7 @@ import (
 )
 
 func TestGenerateTx(t *testing.T) {
-	genTool := NewGeneratorTool(GetAccounts(configs.GenesisAddrKeys))
+	genTool := NewGeneratorTool(GetAccounts(GenesisAddrKeys))
 	signer := types.HomesteadSigner{}
 	result := genTool.GenerateTx(1000)
 	for _, tx := range result {
@@ -51,7 +50,7 @@ func TestGenerateTx(t *testing.T) {
 }
 
 func TestGenerateRandomTx(t *testing.T) {
-	genTool := NewGeneratorTool(GetAccounts(configs.GenesisAddrKeys))
+	genTool := NewGeneratorTool(GetAccounts(GenesisAddrKeys))
 	signer := types.HomesteadSigner{}
 	result := genTool.GenerateRandomTx(1000)
 	for _, tx := range result {
@@ -72,7 +71,7 @@ func TestGenerateRandomTx(t *testing.T) {
 }
 
 func TestGenerateRandomTxWithState(t *testing.T) {
-	genTool := NewGeneratorTool(GetAccounts(configs.GenesisAddrKeys))
+	genTool := NewGeneratorTool(GetAccounts(GenesisAddrKeys))
 	statedb, _ := state.New(log.New(), common.Hash{}, state.NewDatabase(memorydb.New()))
 	result := genTool.GenerateRandomTxWithState(10, statedb)
 	signer := types.HomesteadSigner{}
@@ -94,7 +93,7 @@ func TestGenerateRandomTxWithState(t *testing.T) {
 }
 
 func containsInGenesis(address string) bool {
-	for k := range configs.GenesisAccounts {
+	for k := range GenesisAccounts {
 		if k == address {
 			return true
 		}
