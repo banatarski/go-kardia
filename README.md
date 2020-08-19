@@ -13,7 +13,7 @@ Official Golang implementation of Kardia chain following the specs in [Technical
 
 # Kardia private testnet
 - Block explorer UI: [Kardiascan](http://explorer.kardiachain.io/)
-- Release: [kardia-v0.8.0](https://github.com/kardiachain/go-kardia/releases/tag/v0.8.4)
+- Release: [kardia-v0.8.4](https://github.com/kardiachain/go-kardia/releases/tag/v0.8.4)
 
 
 # Quickstart
@@ -33,7 +33,7 @@ Copy and execute below script to start Kardia testnet without checking out the s
 See [deployment](https://github.com/kardiachain/go-kardia/tree/master/deployment) for more details.  
 
 ### Run local testnet with docker
-- See [docker](https://github.com/kardiachain/go-kardia/tree/master/docker) for more details.
+- See [docker](https://github.com/kardiachain/go-kardia/tree/master/docker/local) for more details.
 
 # Development
 ### Go environment setup
@@ -50,6 +50,7 @@ Download library dependency and build Kardia binary.
 ```
 cd $GOPATH/src/github.com/kardiachain/go-kardia
 dep ensure
+cd $GOPATH/src/github.com/kardiachain/go-kardia/cmd
 go install
 ```
 
@@ -72,9 +73,9 @@ go test ./...
 
 ### Start Kardia node
 ```
-./go-kardia --dev --mainChainValIndexes 1,2,3 --addr :3000 --name node1 --rpc --rpcport 8545 --clearDataDir --peer enode://7a86e2b7628c76fcae76a8b37025cba698a289a44102c5c021594b5c9fce33072ee7ef992f5e018dc44b98fa11fec53824d79015747e8ac474f4ee15b7fbe860@127.0.0.1:3000,enode://660889e39b37ade58f789933954123e56d6498986a0cd9ca63d223e866d5521aaedc9e5298e2f4828a5c90f4c58fb24e19613a462ca0210dd962821794f630f0@127.0.0.1:3001,enode://2e61f57201ec804f9d5298c4665844fd077a2516cd33eccea48f7bdf93de5182da4f57dc7b4d8870e5e291c179c05ff04100718b49184f64a7c0d40cc66343da@127.0.0.1:3002
-./go-kardia --dev --mainChainValIndexes 1,2,3 --addr :3001 --name node2 --rpc --rpcport 8546 --clearDataDir --peer enode://7a86e2b7628c76fcae76a8b37025cba698a289a44102c5c021594b5c9fce33072ee7ef992f5e018dc44b98fa11fec53824d79015747e8ac474f4ee15b7fbe860@127.0.0.1:3000,enode://660889e39b37ade58f789933954123e56d6498986a0cd9ca63d223e866d5521aaedc9e5298e2f4828a5c90f4c58fb24e19613a462ca0210dd962821794f630f0@127.0.0.1:3001,enode://2e61f57201ec804f9d5298c4665844fd077a2516cd33eccea48f7bdf93de5182da4f57dc7b4d8870e5e291c179c05ff04100718b49184f64a7c0d40cc66343da@127.0.0.1:3002
-./go-kardia --dev --mainChainValIndexes 1,2,3 --addr :3002 --name node3 --rpc --rpcport 8547 --clearDataDir --peer enode://7a86e2b7628c76fcae76a8b37025cba698a289a44102c5c021594b5c9fce33072ee7ef992f5e018dc44b98fa11fec53824d79015747e8ac474f4ee15b7fbe860@127.0.0.1:3000,enode://660889e39b37ade58f789933954123e56d6498986a0cd9ca63d223e866d5521aaedc9e5298e2f4828a5c90f4c58fb24e19613a462ca0210dd962821794f630f0@127.0.0.1:3001,enode://2e61f57201ec804f9d5298c4665844fd077a2516cd33eccea48f7bdf93de5182da4f57dc7b4d8870e5e291c179c05ff04100718b49184f64a7c0d40cc66343da@127.0.0.1:3002
+./cmd --config <path/to/config_file.yaml>
+./cmd --config <path/to/config_file.yaml>
+./cmd --config <path/to/config_file.yaml>
 ```
 
 ### Monitor blocks with Kardiascan
